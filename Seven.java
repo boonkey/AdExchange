@@ -115,7 +115,8 @@ public class Seven extends Agent {
 	private static double impressionOpertunitiesPerUserPerDay = 1.42753;
 	private ReadUserData userData;
 	private double criticalFactor;
-	
+	private Map<String , Double> publisherPopularityMap;
+
 	//Added by Katrin
 	//UCS parameters
 	private static double pi = 0.2;
@@ -304,9 +305,8 @@ public class Seven extends Agent {
 			double ucsLevel = adNetworkDailyNotification.getServiceLevel();
 			
 			//Added By Katrin
-			//ucsBid = 0.1 + random.nextDouble()/10.0;		
 			
-			if(null != myActiveCampaigns && !myActiveCampaigns.isEmpty()){
+			if(null != myActiveCampaigns && myActiveCampaigns.isEmpty()){//TODO - check isEmpty() return value
 				if (ucsBid != 0) {
 					lastUcsBid = ucsBid;
 					lastUcsLevel = ucsLevel;
@@ -508,8 +508,9 @@ public class Seven extends Agent {
 						}
 
 					}
-					if(query.getMarketSegments().size() == 0 && userData.getUserOrientation(query.getPublisher(), campaign.targetSegment) > 0.6){//define probability parameter
-						bidBundle.addQuery(query, bid/**TODO query.getPublisher().*/ , new Ad(null),
+					double publisherProfitProbability = userData.getUserOrientation(query.getPublisher(), campaign.targetSegment) * publisherPopularityMap.get(query.getPublisher());
+					if(query.getMarketSegments().size() == 0 && publisherProfitProbability > 0.6){//TODO - define probability parameter
+						bidBundle.addQuery(query, bid * publisherProfitProbability , new Ad(null),
 								campaign.id, 1);//TODO - What to do if we don't know which of the users is the one to enter the website
 					}
 					else{
@@ -566,6 +567,9 @@ public class Seven extends Agent {
 		for (PublisherCatalogEntry publisherKey : adxPublisherReport.keys()) {
 			AdxPublisherReportEntry entry = adxPublisherReport
 					.getEntry(publisherKey);
+					
+			publisherPopularityMap.put(entry.getPublisherName(), ((double)entry.getPopularity())/10000.0);
+
 			System.out.println(entry.toString());
 			entry.getAdTypeOrientation();
 
@@ -607,7 +611,8 @@ public class Seven extends Agent {
 		activeCampaigns = new HashMap<Integer, CampaignData>();
 		userData = new ReadUserData();
 		criticalFactor = 1.2;
-		
+		publisherPopularityMap = new HashMap<String , Double>();
+
 		
 		log.fine("AdNet " + getName() + " simulationSetup");
 	}
@@ -815,23 +820,28 @@ public class Seven extends Agent {
 		double badLeftImpressionsToAchieve =  Math.max(impressionOpertunitiesPerUserPerDay * marketSegmentSize, campaign.impsTogo());
 		double catastropheImpressionsToAchieve = Math.max(impressionOpertunitiesPerUserPerDay * marketSegmentSize * ((int)(campaign.dayEnd - day +1)), campaign.impsTogo());
 		
+		double currentReach = campaign.impsTogo()/(((double)(campaign.dayEnd - day + 1)) * (MarketSegment.usersInMarketSegments().get(campaign.targetSegment)));
+		
 		//bad stuff going on //TODO - define a parameter through which we'll choose a specific campaign to be crucial for rating (has to be closest campaign to end for effectiveness
-		if((day< 5) ||(campaign.impsTogo()/((double)(campaign.dayEnd - day + 1) * (MarketSegment.usersInMarketSegments().get(campaign.targetSegment))) < 0.9/*maybe change this*/ * campaign.neededReach)){
-			return (1/catastropheImpressionsToAchieve)*(2/a)*(Math.atan(a*((catastropheImpressionsToAchieve + impressionsAchieved)/campaign.neededReach)-b) - Math.atan(a*(impressionsAchieved/campaign.neededReach)-b));
-		}	//these are the campaigns whose end's the nearest, everything went to ship and its their responsibility to solve the issue
+		if(day < 5 || currentReach < 0.9 * campaign.neededReach){
+			return calcGainedPercentage(campaign , catastropheImpressionsToAchieve , impressionsAchieved);
+		}	//these are the campaigns whose end's the nearest, everything went badly and its their responsibility to solve the issue
 
-		else if((!campaign.critical) && (campaign.impsTogo()/((double)(campaign.dayEnd - day + 1) * (MarketSegment.usersInMarketSegments().get(campaign.targetSegment))) < campaign.neededReach) && (campaign.impsTogo()/((double)(campaign.dayEnd - day + 1) * (MarketSegment.usersInMarketSegments().get(campaign.targetSegment))) > 0.9/*maybe change this*/ * campaign.neededReach)){//default situation - all is well
-			return (1/badLeftImpressionsToAchieve)*(2/a)*(Math.atan(a*((badLeftImpressionsToAchieve + impressionsAchieved)/campaign.neededReach)-b) - Math.atan(a*(impressionsAchieved/campaign.neededReach)-b));
+		else if(!campaign.critical && currentReach < campaign.neededReach && currentReach > 0.9 * campaign.neededReach){//default situation - all is well
+			return calcGainedPercentage(campaign , badLeftImpressionsToAchieve , impressionsAchieved);
 		} //bad stuff going on - but this campaign is not the one I'm going to waste money on
 		
-		else if((!campaign.critical) && ((!campaign.critical) && campaign.impsTogo()/((double)(campaign.dayEnd - day + 1) * (MarketSegment.usersInMarketSegments().get(campaign.targetSegment))) > campaign.neededReach)){
-			return (1/leftImpressionsToAchieve)*(2/a)*(Math.atan(a*((leftImpressionsToAchieve + impressionsAchieved)/campaign.neededReach)-b) - Math.atan(a*(impressionsAchieved/campaign.neededReach)-b));
+		else if(!campaign.critical && currentReach > campaign.neededReach){
+			return calcGainedPercentage(campaign , leftImpressionsToAchieve , impressionsAchieved);
 		}
 		else{
-			return criticalFactor*(1/catastropheImpressionsToAchieve)*(2/a)*(Math.atan(a*((catastropheImpressionsToAchieve + impressionsAchieved)/campaign.neededReach)-b) - Math.atan(a*(impressionsAchieved/campaign.neededReach)-b));
+			return criticalFactor*(calcGainedPercentage(campaign , catastropheImpressionsToAchieve , impressionsAchieved));
 		}
 	}
 
+	private double calcGainedPercentage(CampaignData campaign , double toAdd , double current){
+		return (1/toAdd)*(2/a)*(Math.atan(a*((toAdd + current)/campaign.neededReach)-b) - Math.atan(a*(current/campaign.neededReach)-b));
+	}
 
 	private void resetCriticalParameter(){
 		for(CampaignData campaign: myActiveCampaigns.values()){
