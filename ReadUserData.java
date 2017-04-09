@@ -71,6 +71,8 @@ public class ReadUserData {
 		readPublisherOrientationData();
 	}
 
+	//TODO - maybe we'll have to change the names in the code
+
 	void readPublisherOrientationData(){
 		publisherAudienceOrientation = new HashMap<AudienceOrientation , Double>();
 
@@ -203,38 +205,12 @@ public class ReadUserData {
 
 	
 	public double getUserOrientation(String publisher , Set<MarketSegment> ms){
-		double prob = 0.0;
-		for(Set<MarketSegment> segment : SubMarketSegment(ms)){
-			double tmp = 1.0;
-			for(MarketSegment seg: segment){
-				tmp *= publisherAudienceOrientation.get(new AudienceOrientation(publisher , seg));
-			}
-			prob += tmp;
+		double prob = 1.0;
+		for(MarketSegment segment : ms){
+			prob *= publisherAudienceOrientation.get(new AudienceOrientation(publisher , segment));
 		}
 		return prob;
 	}
-
-	private Set<Set<MarketSegment>> SubMarketSegment(Set<MarketSegment> marketSegment){
-		if(marketSegment == null) return null;
-
-		Set<Set<MarketSegment>> subSegments = new HashSet<Set<MarketSegment>>();
-		boolean flag;
-
-		for(Set<MarketSegment> marketSegmentSet: MarketSegment.marketSegments()){
-			if(marketSegmentSet.size() != 3){continue;}
-			flag = true;
-			for(MarketSegment segment: marketSegment){
-				if(!marketSegmentSet.contains(segment)){
-					flag = false;
-					break;
-				}
-			}
-			if(flag){ subSegments.add(marketSegmentSet); }
-		}
-
-		return subSegments;
-	}
-
 	
 	private class AudienceOrientation{
 		String publisherName;
