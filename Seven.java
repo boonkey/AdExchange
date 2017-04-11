@@ -827,7 +827,7 @@ public class Seven extends Agent {
 			return calcGainedPercentage(campaign , catastropheImpressionsToAchieve , impressionsAchieved);
 		}	//these are the campaigns whose end's the nearest, everything went badly and its their responsibility to solve the issue
 
-		else if(!campaign.critical && currentReach < campaign.neededReach && currentReach > 0.9 * campaign.neededReach){//default situation - all is well
+		else if(()!campaign.critical) && ((currentReach < campaign.neededReach && currentReach > 0.9 * campaign.neededReach) || campaign.getCampaignLength() < 5)){//default situation - all is well
 			return calcGainedPercentage(campaign , badLeftImpressionsToAchieve , impressionsAchieved);
 		} //bad stuff going on - but this campaign is not the one I'm going to waste money on
 		
@@ -835,7 +835,7 @@ public class Seven extends Agent {
 			return calcGainedPercentage(campaign , leftImpressionsToAchieve , impressionsAchieved);
 		}
 		else{
-			return criticalFactor*(calcGainedPercentage(campaign , catastropheImpressionsToAchieve , impressionsAchieved));
+			return criticalFactor * (calcGainedPercentage(campaign , catastropheImpressionsToAchieve , impressionsAchieved));
 		}
 	}
 
