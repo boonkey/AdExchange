@@ -306,7 +306,7 @@ public class Seven extends Agent {
 			
 			//Added By Katrin
 			
-			if(null != myActiveCampaigns && myActiveCampaigns.isEmpty()){//TODO - check isEmpty() return value
+			if(null != myActiveCampaigns && myActiveCampaigns.isEmpty()){
 				if (ucsBid != 0) {
 					lastUcsBid = ucsBid;
 					lastUcsLevel = ucsLevel;
@@ -415,14 +415,16 @@ public class Seven extends Agent {
 		/*
 		 * add bid entries w.r.t. each active campaign with remaining contracted
 		 * impressions.
-		 * 
-		 * for now, a single entry per active campaign is added for queries of
-		 * matching target segment.
 		 */
 		removeNonactiveCampaigns();
-		//
+
 		resetCriticalParameter();
-		if(ratingImprovementCrucial()){defineCrucialCampaigns();}//TODO
+		
+		/* Check the current rating situation and decide how critical it is to improve it
+		 * i.e. ask ourselves: "are we willing to lose money on campaigns to improve our
+		 * rating?"
+		 */
+		if(ratingImprovementCrucial()){defineCrucialCampaigns();}
 
 		//Decide weight of a campaign
 		Map <Set<MarketSegment> , Set<CampaignData>> campaignOverlaps = new HashMap<Set<MarketSegment> , Set<CampaignData>>();		
@@ -456,24 +458,6 @@ public class Seven extends Agent {
 			}
 		}	
 
-
-		/*		
-		//Actually bid for the campaign
-		for(CampaignData campaign: myActiveCampaigns.values()){
-			//Added by Daniel
-			Map<MarketSegment, Map<CampaignData , Double>> competition = new HashMap<MarketSegment, Map<CampaignData , Double>>();
-
-			for(Set<MarketSegment> marketSegment : (SubMarketSegment(campaign.targetSegment))){
-//-------------Not necessary at the moment--------------------
-				double tmp = 0;
-				for(CampaignData competingCampaign: activeCampaigns.values()){
-					if(marketSegment.containsAll(competingCampaign.targetSegment) && (campaign.id != competingCampaign.id))
-						tmp += competingCampaign.neededReach;
-				}
-				competition.put(key, tmp);
-//------------------------------------------------------------
-			}*/
-
 		//Actually bid for the campaign
 		for(CampaignData campaign: myActiveCampaigns.values()){
 
@@ -495,25 +479,32 @@ public class Seven extends Agent {
 						if (query.getAdType() == AdType.text) {
 							entCount++;
 						} else {
-							entCount += campaign.videoCoef;
+							entCount ++;
 							bid *= campaign.videoCoef;
 						}
 					} else {
 						if (query.getAdType() == AdType.text) {
-							entCount+=campaign.mobileCoef;
+							entCount++;
 							bid *= campaign.mobileCoef;
 						} else {
-							entCount += campaign.videoCoef + campaign.mobileCoef;
+							entCount ++;
 							bid *= (campaign.videoCoef + campaign.mobileCoef);
 						}
-
 					}
+
 					double publisherProfitProbability = userData.getUserOrientation(query.getPublisher(), campaign.targetSegment) * publisherPopularityMap.get(query.getPublisher());
-					if(query.getMarketSegments().size() == 0 && publisherProfitProbability > 0.6){//TODO - define probability parameter
-						bidBundle.addQuery(query, bid * publisherProfitProbability , new Ad(null),
-								campaign.id, 1);//TODO - What to do if we don't know which of the users is the one to enter the website
+					if(query.getMarketSegments().size() == 0 && publisherProfitProbability > 0.6 && (!campaign.critical)){//TODO - define probability parameter
+						//Unknown market segment, but the campaign is critical, so we're willing to pay more money for it
+						bidBundle.addQuery(query, bid , new Ad(null),
+								campaign.id, 1);
+					}
+					else if(campaign.critical && query.getMarketSegments().size() == 0 && publisherProfitProbability > 0.5){
+						//Unknown market segment, but the campaign is critical, so we're willing to pay more money for it
+						bidBundle.addQuery(query, bid , new Ad(null),
+								campaign.id, 1);
 					}
 					else{
+						//We know which market segment the user belongs to, bid the usual bid
 						bidBundle.addQuery(query, bid , new Ad(null),
 								campaign.id, campaignWeights.get(campaign));
 					}
@@ -522,8 +513,14 @@ public class Seven extends Agent {
 
 				double impressionLimit = campaign.impsTogo();//TODO - overachiever - maybe implement it here
 				double budgetLimit = campaign.budget;
-				bidBundle.setCampaignDailyLimit(campaign.id,
-						(int) impressionLimit, budgetLimit);
+				if(!campaign.critical){
+					bidBundle.setCampaignDailyLimit(campaign.id,
+							(int) impressionLimit, budgetLimit);
+				}
+				else{
+					bidBundle.setCampaignDailyLimit(campaign.id,
+							(int) impressionLimit, budgetLimit * criticalFactor);	
+				}
 
 				System.out.println("Day " + day + ": Updated " + entCount
 						+ " Bid Bundle entries for Campaign id " + campaign.id);
@@ -556,7 +553,7 @@ public class Seven extends Agent {
 					+ cstats.getTargetedImps() + " tgtImps "
 					+ cstats.getOtherImps() + " nonTgtImps. Cost of imps is "
 					+ cstats.getCost());
-		}//TODO
+		}
 	}
 
 	/**
@@ -573,7 +570,7 @@ public class Seven extends Agent {
 			System.out.println(entry.toString());
 			entry.getAdTypeOrientation();
 
-		}//TODO - add considerations of the reports!
+		}
 	}
 
 	/**
@@ -713,7 +710,6 @@ public class Seven extends Agent {
 					campaignData.targetSegment, Device.pc, AdType.video));
 
 			//--------------------------added by Daniel ------------------------
-			//TODO - add reference to campaigns where the UCS's too low!
 			campaignQueriesSet.add(new AdxQuery(PublisherName,
 					new HashSet<MarketSegment>(), Device.mobile,
 					AdType.video));
@@ -774,45 +770,6 @@ public class Seven extends Agent {
 	}
 
 
-	/*
-	 * generates the campaign queries relevant for the specific campaign, and assign them as the campaign's campaignQueries field 
-	 */
-	private void genCampaignQueries2(CampaignData campaignData) {
-		Set<AdxQuery> campaignQueriesSet = new HashSet<AdxQuery>();
-		for (String PublisherName : publisherNames) {
-			for(Set<MarketSegment> segment : SubMarketSegment(campaignData.targetSegment)){
-				campaignQueriesSet.add(new AdxQuery(PublisherName,
-						segment, Device.mobile, AdType.text));
-				campaignQueriesSet.add(new AdxQuery(PublisherName,
-						segment, Device.mobile, AdType.video));
-				campaignQueriesSet.add(new AdxQuery(PublisherName,
-						segment, Device.pc, AdType.text));
-				campaignQueriesSet.add(new AdxQuery(PublisherName,
-						segment, Device.pc, AdType.video));
-			}
-			//--------------------------added by Daniel ------------------------
-			//TODO - add reference to campaigns where the UCS's too low!
-			campaignQueriesSet.add(new AdxQuery(PublisherName,
-					new HashSet<MarketSegment>(), Device.mobile,
-					AdType.video));
-			campaignQueriesSet.add(new AdxQuery(PublisherName,
-					new HashSet<MarketSegment>(), Device.mobile,
-					AdType.text));
-			campaignQueriesSet.add(new AdxQuery(PublisherName,
-					new HashSet<MarketSegment>(), Device.pc, AdType.video));
-			campaignQueriesSet.add(new AdxQuery(PublisherName,
-					new HashSet<MarketSegment>(), Device.pc, AdType.text));
-			//------------------------------------------------------------------
-		}
-
-		campaignData.campaignQueries = new AdxQuery[campaignQueriesSet.size()];
-		campaignQueriesSet.toArray(campaignData.campaignQueries);
-		System.out.println("!!!!!!!!!!!!!!!!!!!!!!"+Arrays.toString(campaignData.campaignQueries)+"!!!!!!!!!!!!!!!!");
-
-
-	}
-
-
 	private double campaignProfitability(CampaignData campaign){
 		double marketSegmentSize = (double) MarketSegment.marketSegmentSize(campaign.targetSegment);
 		double impressionsAchieved = campaign.stats.getTargetedImps();
@@ -822,21 +779,25 @@ public class Seven extends Agent {
 		
 		double currentReach = campaign.impsTogo()/(((double)(campaign.dayEnd - day + 1)) * (MarketSegment.usersInMarketSegments().get(campaign.targetSegment)));
 		
+		double payment = 0;
+		
 		//bad stuff going on //TODO - define a parameter through which we'll choose a specific campaign to be crucial for rating (has to be closest campaign to end for effectiveness
 		if(day < 5 || currentReach < 0.9 * campaign.neededReach){
-			return calcGainedPercentage(campaign , catastropheImpressionsToAchieve , impressionsAchieved);
+			payment = calcGainedPercentage(campaign , catastropheImpressionsToAchieve , impressionsAchieved);
 		}	//these are the campaigns whose end's the nearest, everything went badly and its their responsibility to solve the issue
 
-		else if(()!campaign.critical) && ((currentReach < campaign.neededReach && currentReach > 0.9 * campaign.neededReach) || campaign.getCampaignLength() < 5)){//default situation - all is well
-			return calcGainedPercentage(campaign , badLeftImpressionsToAchieve , impressionsAchieved);
+		else if((!campaign.critical) && ((currentReach < campaign.neededReach && currentReach > 0.9 * campaign.neededReach) || campaign.getCampaignLength() < 5)){//default situation - all is well
+			payment = calcGainedPercentage(campaign , badLeftImpressionsToAchieve , impressionsAchieved);
 		} //bad stuff going on - but this campaign is not the one I'm going to waste money on
 		
 		else if(!campaign.critical && currentReach > campaign.neededReach){
-			return calcGainedPercentage(campaign , leftImpressionsToAchieve , impressionsAchieved);
+			payment = calcGainedPercentage(campaign , leftImpressionsToAchieve , impressionsAchieved);
 		}
-		else{
-			return criticalFactor * (calcGainedPercentage(campaign , catastropheImpressionsToAchieve , impressionsAchieved));
+		else{//The campaign is considered critical in improving our rating
+			payment = criticalFactor * (calcGainedPercentage(campaign , catastropheImpressionsToAchieve , impressionsAchieved));
 		}
+		
+		return payment * 1000;//TODO - Multiply by 1000 because we're paying in CPMs 
 	}
 
 	private double calcGainedPercentage(CampaignData campaign , double toAdd , double current){
@@ -892,9 +853,11 @@ public class Seven extends Agent {
 		if(day <= 5){return true;}
 		else if(qualityScore <= 1.0 && day <=20){return true;}
 		else if(qualityScore <= 0.95 && day <=40){return true;}
-		else if(qualityScore <= 0.95 && day <=50){return true;}
+		else if(qualityScore <= 0.80 && day <=50){return true;}
 		return false;
-	}//TODO
+	}//TODO - see what Oriel did in the implementation - He's the one to define how critical the rating is!!!!! (change this comment before submission)
+
+	
 	private double CalcRatingSignificance(){
 		/*
 		 * Calculating a function that decides the importance of the rating
