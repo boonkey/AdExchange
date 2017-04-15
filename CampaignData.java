@@ -33,6 +33,12 @@ public class CampaignData {
 		double currentRatio;
 		double ratioTillFinish;
 
+		//Added by Daniel
+		private double neededReach;
+		private boolean critical;//Was the campaign chosen for improving our rating
+		private double promisedPayment;//What we'll get payed for 100% of the impressions needed for the campaign
+
+		
 		public CampaignData(InitialCampaignMessage icm) {
 			dayStart = icm.getDayStart();
 			dayEnd = icm.getDayEnd();
@@ -52,7 +58,11 @@ public class CampaignData {
 			currentRatio = 0;
 			ratioTillFinish = reachImps/(1+dayEnd-dayStart);
 			campaignDifficulty = (double)reachImps/((double)(1+dayEnd-dayStart)*(double)(MarketSegment.marketSegmentSize(targetSegment)));
-		}
+
+			//Added by Daniel
+			neededReach = ((double)reachImps)/(((double)this.getCampaignLength()) * ((double)MarketSegment.usersInMarketSegments().get(targetSegment)));
+			campaign.critical = false;
+			}
 
 		public CampaignData(CampaignOpportunityMessage com) {
 			dayStart = com.getDayStart();
@@ -73,6 +83,10 @@ public class CampaignData {
 			currentRatio = 0;
 			ratioTillFinish = reachImps/(1+dayEnd-dayStart);
 			campaignDifficulty = (double)reachImps/((double)(1+dayEnd-dayStart)*(double)(MarketSegment.marketSegmentSize(targetSegment)));
+
+			//Added by Daniel
+			neededReach = ((double)reachImps)/(((double)this.getCampaignLength()) * ((double)MarketSegment.usersInMarketSegments().get(targetSegment)));
+			campaign.critical = false;
 		}
 
 		@Override
@@ -122,14 +136,46 @@ public class CampaignData {
 			}
 		}
 		
+		//Added by Daniel ----------------------------------------------
+		public void setCriticalParameter(boolean newValue){
+			critical = newValue;
+		}
+		
+		public void setPromisedPayment(double newValue){
+			promisedPayment = newValue;
+		}
+		//--------------------------------------------------------------
+		
 		
 		/*========================================================
 		 *						getters 
 		 =======================================================*/
-		public int impsTogo() {
-			return (int) Math.max(0, reachImps - stats.getTargetedImps());
+		 //Added by Daniel ------------------------------------------
+		//Allow ourselves to overachieve
+		int impsTogo() {
+			return (int) Math.max(0 , 1.1 * reachImps - stats.getTargetedImps());//TODO
+		}
+		//If we don't want to overachieve
+		int competitionImpsToGo(){
+			return (int) Math.max(0 , reachImps - stats.getTargetedImps());//TODO
 		}
 		
+		boolean isCritical(){
+			return critical;
+		}
+		
+		double getNeededReach(){
+			return neededReach;
+		}
+		
+		public int getCampaignLength(){
+			return ((int) this.dayEnd - (int)this.dayStart) + 1;
+		}
+
+		public double getPromisedPayment(){
+			return promisedPayment;
+		}
+		//------------------------------------------------------------
 		public int daysTogo(int day){
 			return (int) dayEnd-day;
 		}
@@ -145,12 +191,8 @@ public class CampaignData {
 		public long getdayEnd() {
 			return dayEnd;
 		}
-		
-		public long getLength(){
-			return dayEnd - dayStart;
-		}
-		
-		public Set<MarketSegment> gettargetSegment() {
+				
+		public Set<MarketSegment> getTargetSegment() {
 			return targetSegment;
 		}
 		
@@ -158,15 +200,15 @@ public class CampaignData {
 			return id;
 		}
 		
-		public double getvideoCoef() {
+		public double getVideoCoef() {
 			return videoCoef;
 		}
 		
-		public double getmobileCoef() {
+		public double getMobileCoef() {
 			return mobileCoef;
 		}
 		
-		public long getreachImps(){
+		public long getReachImps(){
 			return reachImps;
 		}
 		
@@ -210,8 +252,7 @@ public class CampaignData {
 			return campaignDifficulty;
 		}
 		
-		public AdxQuery[] getcampaignQueries(){
+		public AdxQuery[] getCampaignQueries(){
 			return campaignQueries; 
 		}
 }
-

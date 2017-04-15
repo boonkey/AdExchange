@@ -113,7 +113,7 @@ public class Seven extends Agent {
 	//Added by Daniel
 	private Map<Integer, CampaignData> myActiveCampaigns;
 	private Map<Integer, CampaignData> activeCampaigns;
-	double qualityScore = 1.0;
+	double qualityScore;
 	private static double a = 4.08577;
 	private static double b = 3.08577;
 	private static double impressionOpertunitiesPerUserPerDay = 1.42753;
@@ -297,7 +297,7 @@ public class Seven extends Agent {
 		long cmpimps = com.getReachImps();
 		//Added by Daniel -> call to Oriel's method for the bid for the campaign
 		long cmpBidMillis = CampaignEngine.CalcPayment(pendingCampaign ,myActiveCampaigns , activeCampaigns , day , qualityScore);
-		pendingCampaign.promisedPayment = (double) cmpBidMillis;
+		pendingCampaign.setPromisedPayment((double) cmpBidMillis);
 		
 		System.out.println("Day " + day + ": Campaign total budget bid (millis): " + cmpBidMillis);
 
@@ -333,7 +333,7 @@ public class Seven extends Agent {
 		}
 
 		/* Note: Campaign bid is in millis */
-		AdNetBidMessage bids = new AdNetBidMessage(ucsBid, pendingCampaign.id, cmpBidMillis);
+		AdNetBidMessage bids = new AdNetBidMessage(ucsBid, pendingCampaign.getId(), cmpBidMillis);
 		sendMessage(demandAgentAddress, bids);
 	}
 	
@@ -372,14 +372,14 @@ public class Seven extends Agent {
 		String campaignAllocatedTo = " allocated to "
 				+ notificationMessage.getWinner();
 
-		if ((pendingCampaign.id == adNetworkDailyNotification.getCampaignId())
+		if ((pendingCampaign.getId() == adNetworkDailyNotification.getCampaignId())
 				&& (notificationMessage.getCostMillis() != 0)) {
 
 			/* add campaign to list of won campaigns */
 			pendingCampaign.setBudget(notificationMessage.getCostMillis()/1000.0);
 			currCampaign = pendingCampaign;
 			genCampaignQueries(currCampaign);
-			myCampaigns.put(pendingCampaign.id, pendingCampaign);
+			myCampaigns.put(pendingCampaign.getId(), pendingCampaign);
 
 			campaignAllocatedTo = " WON at cost (Millis)"
 					+ notificationMessage.getCostMillis();
@@ -436,7 +436,7 @@ public class Seven extends Agent {
 		Map <CampaignData , Integer> campaignWeights = new HashMap<CampaignData,Integer>();
 
 		for(CampaignData campaign : myActiveCampaigns.values()){
-			for(Set<MarketSegment> segment: SubMarketSegment(campaign.targetSegment)){
+			for(Set<MarketSegment> segment: SubMarketSegment(campaign.getTargetSegment())){
 				Set<CampaignData> set = campaignOverlaps.get(segment);
 				if(set == null){
 					set = new HashSet<CampaignData>();
@@ -450,15 +450,15 @@ public class Seven extends Agent {
 		for(CampaignData campaign : myActiveCampaigns.values()){
 			boolean competition = false;
 			int weight = 1;
-			for(Set<MarketSegment> segment : SubMarketSegment(campaign.targetSegment)){
+			for(Set<MarketSegment> segment : SubMarketSegment(campaign.getTargetSegment())){
 				if(campaignOverlaps.get(segment).size() > 2){competition = true;}
 			}
 
 			if(competition){
-				campaignWeights.put(campaign, (int) (campaign.competitionImpsToGo()/(campaign.dayEnd - day +1)* 10.0));
+				campaignWeights.put(campaign, (int) (campaign.competitionImpsToGo()/(campaign.getdayEnd() - day +1)* 10.0));
 			}
 			
-			if(campaign.critical){//put a lot on the critical, divide weight among the others
+			if(campaignisCritical()){//put a lot on the critical, divide weight among the others
 				campaignWeights.put(campaign, 10 * weight);
 			}
 		}	
@@ -470,7 +470,7 @@ public class Seven extends Agent {
 
 			int entCount = 0;
 
-			for (AdxQuery query : campaign.campaignQueries) {
+			for (AdxQuery query : campaign.getCampaignQueries()) {
 				double bid = rbid;
 				
 				/*
@@ -484,52 +484,52 @@ public class Seven extends Agent {
 						entCount++;
 					} else {
 						entCount ++;
-						bid *= campaign.videoCoef;
+						bid *= campaign.getVideoCoef();
 					}
 				} else {
 					if (query.getAdType() == AdType.text) {
 						entCount++;
-						bid *= campaign.mobileCoef;
+						bid *= campaign.getMobileCoef();
 					} else {
 						entCount ++;
-						bid *= (campaign.videoCoef + campaign.mobileCoef);
+						bid *= (campaign.getVideoCoef() + campaign.getMobileCoef());
 					}
 				}
 
-				double publisherProfitProbability = userData.getUserOrientation(query.getPublisher(), campaign.targetSegment) * publisherPopularityMap.get(query.getPublisher());
-				if(query.getMarketSegments().size() == 0 && publisherProfitProbability > 0.6 && (!campaign.critical)){//TODO - Dan - define probability parameter (maybe change 0.6 to something else)
+				double publisherProfitProbability = userData.getUserOrientation(query.getPublisher(), campaign.getTargetSegment()) * publisherPopularityMap.get(query.getPublisher());
+				if(query.getMarketSegments().size() == 0 && publisherProfitProbability > 0.6 && (!campaign.isCritical())){//TODO - Dan - define probability parameter (maybe change 0.6 to something else)
 					/* Unknown market segment, and the campaign isn't critical, so we're willing
 					 * to pay for it only if we're fairly sure who's the user
 					 */
 					bidBundle.addQuery(query, bid , new Ad(null),
-							campaign.id, 1);
+							campaign.getId(), 1);
 				}
-				else if(campaign.critical && query.getMarketSegments().size() == 0 && publisherProfitProbability > 0.5){
+				else if(campaign.isCritical() && query.getMarketSegments().size() == 0 && publisherProfitProbability > 0.5){
 					//Unknown market segment, but the campaign is critical, so we're willing to pay more money for it
 					bidBundle.addQuery(query, bid , new Ad(null),
-							campaign.id, 1);
+							campaign.getId(), 1);
 				}
 				else{
 					//We know which market segment the user belongs to, bid the usual bid
 					bidBundle.addQuery(query, bid , new Ad(null),
-						campaign.id, campaignWeights.get(campaign));
+						campaign.getId(), campaignWeights.get(campaign));
 				}
 			}
 
 
 			double impressionLimit = campaign.impsTogo();//TODO - overachiever - maybe implement it here
-			double budgetLimit = campaign.budget;
-			if(!campaign.critical){
-				bidBundle.setCampaignDailyLimit(campaign.id,
+			double budgetLimit = campaign.getBudget();
+			if(!campaign.isCritical()){
+				bidBundle.setCampaignDailyLimit(campaign.getId(),
 						(int) impressionLimit, budgetLimit);
 			}
 			else{
-				bidBundle.setCampaignDailyLimit(campaign.id,
+				bidBundle.setCampaignDailyLimit(campaign.getId(),
 						(int) impressionLimit, budgetLimit * criticalFactor);	
 			}
 
 			System.out.println("Day " + day + ": Updated " + entCount
-					+ " Bid Bundle entries for Campaign id " + campaign.id);
+					+ " Bid Bundle entries for Campaign id " + campaign.getId());
 		}
 		if (bidBundle != null) {
 			System.out.println("Day " + day + ": Sending BidBundle");
@@ -614,6 +614,7 @@ public class Seven extends Agent {
 		userData = new ReadUserData();
 		criticalFactor = 1.2;
 		publisherPopularityMap = new HashMap<String , Double>();
+		qualityScore = 1.0;
 
 		
 		log.fine("AdNet " + getName() + " simulationSetup");
@@ -706,13 +707,13 @@ public class Seven extends Agent {
 		Set<AdxQuery> campaignQueriesSet = new HashSet<AdxQuery>();
 		for (String PublisherName : publisherNames) {
 			campaignQueriesSet.add(new AdxQuery(PublisherName,
-					campaignData.targetSegment, Device.mobile, AdType.text));
+					campaignData.getTargetSegment(), Device.mobile, AdType.text));
 			campaignQueriesSet.add(new AdxQuery(PublisherName,
-					campaignData.targetSegment, Device.mobile, AdType.video));
+					campaignData.getTargetSegment(), Device.mobile, AdType.video));
 			campaignQueriesSet.add(new AdxQuery(PublisherName,
-					campaignData.targetSegment, Device.pc, AdType.text));
+					campaignData.getTargetSegment(), Device.pc, AdType.text));
 			campaignQueriesSet.add(new AdxQuery(PublisherName,
-					campaignData.targetSegment, Device.pc, AdType.video));
+					campaignData.getTargetSegment(), Device.pc, AdType.video));
 
 			//--------------------------added by Daniel ------------------------
 			campaignQueriesSet.add(new AdxQuery(PublisherName,
@@ -741,14 +742,14 @@ public class Seven extends Agent {
 	private void removeNonactiveCampaigns(){
 		int dayBiddingFor = day + 1;
 		for(CampaignData campaign: activeCampaigns.values()){
-			if(dayBiddingFor > campaign.dayEnd){
-				activeCampaigns.remove(campaign.id);
-				myActiveCampaigns.remove(campaign.id);
+			if(dayBiddingFor > campaign.getdayEnd()){
+				activeCampaigns.remove(campaign.getId());
+				myActiveCampaigns.remove(campaign.getId());
 			}
 		}
 		for(CampaignData campaign: activeCampaigns.values()){
 			if(campaign.impsTogo() == 0){
-				myActiveCampaigns.remove(campaign.id);
+				myActiveCampaigns.remove(campaign.getId());
 			}
 		}
 	}
@@ -776,13 +777,13 @@ public class Seven extends Agent {
 
 
 	private double campaignProfitability(CampaignData campaign){
-		double marketSegmentSize = (double) MarketSegment.marketSegmentSize(campaign.targetSegment);
+		double marketSegmentSize = (double) MarketSegment.marketSegmentSize(campaign.getTargetSegment());
 		double impressionsAchieved = campaign.stats.getTargetedImps();
 		double leftImpressionsToAchieve = Math.min(impressionOpertunitiesPerUserPerDay * marketSegmentSize, campaign.impsTogo());//TODO campaign. imps left to win
 		double badLeftImpressionsToAchieve =  Math.max(impressionOpertunitiesPerUserPerDay * marketSegmentSize, campaign.impsTogo());
 		double catastropheImpressionsToAchieve = Math.max(impressionOpertunitiesPerUserPerDay * marketSegmentSize * campaign.getCampaignLength(), campaign.impsTogo());
 		
-		double currentReach = campaign.impsTogo()/(((double)(campaign.dayEnd - day + 1)) * (MarketSegment.usersInMarketSegments().get(campaign.targetSegment)));
+		double currentReach = campaign.impsTogo()/(((double)(campaign.getdayEnd() - day + 1)) * (MarketSegment.usersInMarketSegments().get(campaign.getTargetSegment())));
 		
 		double payment = 0;
 		
@@ -791,17 +792,17 @@ public class Seven extends Agent {
 		 * Or the campaign isn't considered critical, but still needs to hurry up to complete
 		 * the campaign.
 		 */
-		if((!campaign.critical) && (day <= 5 || currentReach < 0.9 * campaign.neededReach)){
+		if((!campaign.isCritical()) && (day <= 5 || currentReach < 0.9 * campaign.getNeededReach())){
 			payment = calcGainedPercentage(campaign , catastropheImpressionsToAchieve , impressionsAchieved);
 		}
 
 		 //bad stuff going on - but this campaign is not the one I'm going to waste money on
-		else if((!campaign.critical) && ((currentReach < campaign.neededReach && currentReach > 0.9 * campaign.neededReach) || campaign.getCampaignLength() < 5)){
+		else if((!campaign.isCritical()) && ((currentReach < campaign.getNeededReach() && currentReach > 0.9 * campaign.getNeededReach()) || campaign.getCampaignLength() < 5)){
 			payment = calcGainedPercentage(campaign , badLeftImpressionsToAchieve , impressionsAchieved);
 		}
 		
 		//default situation - all is well
-		else if(!campaign.critical && currentReach > campaign.neededReach){
+		else if(!campaign.isCritical() && currentReach > campaign.getNeededReach()){
 			payment = calcGainedPercentage(campaign , leftImpressionsToAchieve , impressionsAchieved);
 		}
 		
@@ -813,26 +814,26 @@ public class Seven extends Agent {
 		 * Multiply by 1000 because we're paying in CPMs (and not for single impressions)
 		 * and also normalize by the ratio (what we're going to get paid for 100% reach / amount of impressions for 100% reach) 
 		 */
-		return payment * 1000 * (campaign.promisedPayment/((double)campaign.reachImps));
+		return payment * 1000 * (campaign.getPromisedPayment()/((double)campaign.getReachImps()));
 	}
 
 	private double calcGainedPercentage(CampaignData campaign , double toAdd , double current){
-		return (1/toAdd)*(2/a)*(Math.atan(a*((toAdd + current)/campaign.neededReach)-b) - Math.atan(a*(current/campaign.neededReach)-b));
+		return (1/toAdd)*(2/a)*(Math.atan(a*((toAdd + current)/campaign.getNeededReach())-b) - Math.atan(a*(current/campaign.getNeededReach())-b));
 	}
 
 	private void resetCriticalParameter(){
 		for(CampaignData campaign: myActiveCampaigns.values()){
-			if(!campaign.critical){continue;}
-			if(campaign.impsTogo()/((double)(campaign.dayEnd - day + 1) * (MarketSegment.usersInMarketSegments().get(campaign.targetSegment))) < 0.9/*maybe change this*/ * campaign.neededReach){
+			if(!campaign.isCritical()){continue;}
+			if(campaign.impsTogo()/((double)(campaign.getdayEnd() - day + 1) * (MarketSegment.usersInMarketSegments().get(campaign.getTargetSegment()))) < 0.9/*maybe change this*/ * campaign.getNeededReach()){
 				criticalFactor *= 1.05;
 			}
 			else{
-				criticalFactor /= 1.05;//TODO - maybe change this factor
+				criticalFactor /= 1.05;//TODO - Dan - maybe change this factor
 			}
 
-			campaign.critical = false;
+			campaign.setCriticalParameter(false);
 		}
-
+		criticalFactor = Math.max(criticalFactor , 1.1);//TODO - Dan - maybe change the minimal value of the critical parameter
 	}
 
 
@@ -845,8 +846,8 @@ public class Seven extends Agent {
 			public int compare(Entry<Integer, CampaignData> o1, Entry<Integer, CampaignData> o2){
 				CampaignData c1 = o1.getValue();
 				CampaignData c2 = o2.getValue();
-				if(c1.dayEnd != c2.dayEnd){
-					return ((int)(c1.dayEnd - c2.dayEnd));
+				if(c1.getdayEnd() != c2.getdayEnd()){
+					return ((int)(c1.getdayEnd() - c2.getdayEnd()));
 				}
 				else{
 					return c1.getCampaignLength() * c1.impsTogo() - c2.getCampaignLength() * c2.impsTogo();
@@ -883,98 +884,11 @@ public class Seven extends Agent {
 		while(iter.hasNext()){
 			if( i > myActiveCampaigns.size() / 5 || i > 1){break;}
 			CampaignData campaign = iter.next();
-			campaign.critical = true;
+			campaign.setCriticalParameter(true);
 			i++;
 		}
 	}
-
 	
 	//------------------------------------------------------------------------------------------
-
-	private class CampaignData {
-		/* campaign attributes as set by server */
-		Long reachImps;
-		long dayStart;
-		long dayEnd;
-		Set<MarketSegment> targetSegment;
-		double videoCoef;
-		double mobileCoef;
-		int id;
-		private AdxQuery[] campaignQueries;//array of queries relvent for the campaign.
-
-		/* campaign info as reported */
-		CampaignStats stats;
-		double budget;
-
-		//Added by Daniel
-		private double neededReach;
-		private boolean critical;//Was the campaign chosen for improving our rating
-		private double promisedPayment;//What we'll get payed for 100% of the impressions needed for the campaign
-
-
-
-		public CampaignData(InitialCampaignMessage icm) {
-			reachImps = icm.getReachImps();
-			dayStart = icm.getDayStart();
-			dayEnd = icm.getDayEnd();
-			targetSegment = icm.getTargetSegment();
-			videoCoef = icm.getVideoCoef();
-			mobileCoef = icm.getMobileCoef();
-			id = icm.getId();
-
-			stats = new CampaignStats(0, 0, 0);
-			budget = 0.0;
-
-			//Added by Daniel
-			neededReach = reachImps/((this.getCampaignLength()) * (MarketSegment.usersInMarketSegments().get(targetSegment)));
-		}
-
-		public void setBudget(double d) {
-			budget = d;
-		}
-
-		public CampaignData(CampaignOpportunityMessage com) {
-			dayStart = com.getDayStart();
-			dayEnd = com.getDayEnd();
-			id = com.getId();
-			reachImps = com.getReachImps();
-			targetSegment = com.getTargetSegment();
-			mobileCoef = com.getMobileCoef();
-			videoCoef = com.getVideoCoef();
-			stats = new CampaignStats(0, 0, 0);
-			budget = 0.0;
-		}
-
-		@Override
-		public String toString() {
-			return "Campaign ID " + id + ": " + "day " + dayStart + " to "
-					+ dayEnd + " " + targetSegment + ", reach: " + reachImps
-					+ " coefs: (v=" + videoCoef + ", m=" + mobileCoef + ")";
-		}
-		//TODO - overachiever or just achieve to 100%. To be decided by the campaign's complexity
-		int impsTogo() {
-			return (int) Math.max(0 , 1.1 * reachImps - stats.getTargetedImps());//TODO
-		}
-		int competitionImpsToGo(){
-			return (int) Math.max(0 , reachImps - stats.getTargetedImps());//TODO
-		}
-
-		void setStats(CampaignStats s) {
-			stats.setValues(s);
-		}
-
-		public AdxQuery[] getCampaignQueries() {
-			return campaignQueries;
-		}
-
-		public void setCampaignQueries(AdxQuery[] campaignQueries) {
-			this.campaignQueries = campaignQueries;
-		}
-
-		public int getCampaignLength(){
-			return ((int) this.dayEnd - (int)this.dayStart) + 1;
-		}
-
-	}
-
+	//remark - the CampaignData class was removed to a separate file so that other class, besides this one could use it as well
 }

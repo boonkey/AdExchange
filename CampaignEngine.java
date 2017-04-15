@@ -41,12 +41,12 @@ public class CampaignEngine {
 			Map<Integer,CampaignData> MarketActiveCampaigns,int day, double rating){
 			double segmentGrade=0.0;
 			if ((MarketActiveCampaigns==null)||(MarketActiveCampaigns.size()==0)){//no active campaigns
-				segmentGrade=campaign.getreachImps() / ((campaign.getdayEnd() - campaign.getdayStart() + 1) * MarketSegment.marketSegmentSize(campaign.gettargetSegment()));
+				segmentGrade=campaign.getreachImps() / ((campaign.getdayEnd() - campaign.getdayStart() + 1) * MarketSegment.marketSegmentSize(campaign.getTargetSegment()));
 			}
 			else{//initializing parameters
 				m_campaignData = campaign;
 				m_lengthOfCampaign = (int) (m_campaignData.getdayEnd()- m_campaignData.getdayStart()+1);
-				m_Segements = campaign.gettargetSegment();
+				m_Segements = campaign.getTargetSegment();
 				m_TotalMarketActiveCampaignData = ConvertToList(MarketActiveCampaigns);
 				m_lastSuggestionResultsResults = lastCampaign;
 				m_myRating = rating;
@@ -165,7 +165,7 @@ public class CampaignEngine {
 			
 			for (Map.Entry<Integer, CampaignData> entry : activecampaigns.entrySet()){
 				campaign = entry.getValue();
-				CampaignSegment = campaign.gettargetSegment();
+				CampaignSegment = campaign.getTargetSegment();
 				startDay = campaign.getdayStart();
 				endDay = campaign.getdayEnd();
 				
