@@ -38,8 +38,7 @@ public class CampaignEngine {
 		 * calculate campaign offer
 		 */
 		public static long CalcPayment(CampaignData campaign,Map<Integer,CampaignData> ourActiveCampaigns,
-			Map<Integer,CampaignData> MarketActiveCampaigns,int day,CampaignData lastCampaign
-			,double rating){
+			Map<Integer,CampaignData> MarketActiveCampaigns,int day, double rating){
 			double segmentGrade=0.0;
 			if ((MarketActiveCampaigns==null)||(MarketActiveCampaigns.size()==0)){//no active campaigns
 				segmentGrade=campaign.getreachImps() / ((campaign.getdayEnd() - campaign.getdayStart() + 1) * MarketSegment.marketSegmentSize(campaign.gettargetSegment()));
@@ -90,7 +89,7 @@ public class CampaignEngine {
 
 
 		/*the main calculation Function :
-		 * calc the CI - how competing we are
+
 		 * calc the PI
 		 * verify that the offer is in the limitation of the spec
 		 * */
