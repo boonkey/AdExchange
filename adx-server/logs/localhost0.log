@@ -1,0 +1,19 @@
+08/11 15:12:00 INFO file.FileDatabase|infodb: database opened as C:\temp\2015_11_08\adx (1)\adx-server\infodb
+08/11 15:12:00 INFO common.BlockingViewerServer|viewer server started at *:4042
+08/11 15:12:00 INFO file.FileDatabase|infodb: added table localhost_state
+08/11 15:12:00 INFO file.FileDatabase|infodb: added table localhost_comingparticipants
+08/11 15:12:00 INFO file.FileDatabase|infodb: added table localhost_comingsimulations
+08/11 15:12:00 INFO file.FileDatabase|infodb: added table localhost_competitionparts
+08/11 15:12:00 INFO file.FileDatabase|infodb: added table localhost_competitions
+08/11 15:12:00 INFO file.FileDatabase|infodb: added table localhost_competitionresults
+08/11 13:12:00 INFO sim.Admin|adding manager for simulation type tac13adx
+08/11 13:12:00 INFO server.TACTGateway|TACT Server started at *:6502
+08/11 13:14:15 INFO server.TACTChannel|user sample logged in as sample@tact-1 with version 0.9.6 from 127.0.0.1
+08/11 13:14:15 INFO sim.Admin|created simulation 1
+08/11 13:14:18 SEVERE tact.TACTConnection|sample@tact-1: reading error 
+java.net.SocketException: Connection reset
+	at java.net.SocketInputStream.read(Unknown Source)
+	at java.net.SocketInputStream.read(Unknown Source)
+	at java.net.SocketInputStream.read(Unknown Source)
+	at java.io.DataInputStream.readInt(Unknown Source)
+	at se.sics.isl.tact.TACTConnection$TACTReader.run(TACTConnection.java:405)
