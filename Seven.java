@@ -46,7 +46,11 @@ import tau.tac.adx.report.publisher.AdxPublisherReportEntry;
 import edu.umich.eecs.tac.props.Ad;
 import edu.umich.eecs.tac.props.BankStatus;
 
-import Agent.src.Add.ReadUserData;
+import Agent.src.Add.ReadUserData;//TODO - correct the import
+import consts;//TODO - correct the import
+import CampaignData;//TODO - correct the import
+import CampaignEngine;//TODO - correct the import
+
 
 
 /**
@@ -290,10 +294,11 @@ public class Seven extends Agent {
 		 * (upper bound) price for the auction.
 		 */
 
-		Random random = new Random();
 		long cmpimps = com.getReachImps();
-		long cmpBidMillis = random.nextInt((int)cmpimps);
-
+		//Added by Daniel -> call to Oriel's method for the bid for the campaign
+		long cmpBidMillis = CampaignEngine.CalcPayment(pendingCampaign ,myActiveCampaigns , activeCampaigns , day , qualityScore);
+		pendingCampaign.promisedPayment = (double) cmpBidMillis;
+		
 		System.out.println("Day " + day + ": Campaign total budget bid (millis): " + cmpBidMillis);
 
 		/*
@@ -467,64 +472,64 @@ public class Seven extends Agent {
 
 			for (AdxQuery query : campaign.campaignQueries) {
 				double bid = rbid;
-				if (campaign.impsTogo() - entCount > 0) {
-
-					/*
-					 * among matching entries with the same campaign id, the AdX
-					 * randomly chooses an entry according to the designated
-					 * weight. by setting a constant weight 1, we create a
-					 * uniform probability over active campaigns(irrelevant because we are bidding only on one campaign)
-					 */
-					if (query.getDevice() == Device.pc) {
-						if (query.getAdType() == AdType.text) {
-							entCount++;
-						} else {
-							entCount ++;
-							bid *= campaign.videoCoef;
-						}
+				
+				/*
+				 * among matching entries with the same campaign id, the AdX
+				 * randomly chooses an entry according to the designated
+				 * weight. by setting a constant weight 1, we create a
+				 * uniform probability over active campaigns(irrelevant because we are bidding only on one campaign)
+				 */
+				if (query.getDevice() == Device.pc) {
+					if (query.getAdType() == AdType.text) {
+						entCount++;
 					} else {
-						if (query.getAdType() == AdType.text) {
-							entCount++;
-							bid *= campaign.mobileCoef;
-						} else {
-							entCount ++;
-							bid *= (campaign.videoCoef + campaign.mobileCoef);
-						}
+						entCount ++;
+						bid *= campaign.videoCoef;
 					}
-
-					double publisherProfitProbability = userData.getUserOrientation(query.getPublisher(), campaign.targetSegment) * publisherPopularityMap.get(query.getPublisher());
-					if(query.getMarketSegments().size() == 0 && publisherProfitProbability > 0.6 && (!campaign.critical)){//TODO - define probability parameter
-						//Unknown market segment, but the campaign is critical, so we're willing to pay more money for it
-						bidBundle.addQuery(query, bid , new Ad(null),
-								campaign.id, 1);
-					}
-					else if(campaign.critical && query.getMarketSegments().size() == 0 && publisherProfitProbability > 0.5){
-						//Unknown market segment, but the campaign is critical, so we're willing to pay more money for it
-						bidBundle.addQuery(query, bid , new Ad(null),
-								campaign.id, 1);
-					}
-					else{
-						//We know which market segment the user belongs to, bid the usual bid
-						bidBundle.addQuery(query, bid , new Ad(null),
-								campaign.id, campaignWeights.get(campaign));
+				} else {
+					if (query.getAdType() == AdType.text) {
+						entCount++;
+						bid *= campaign.mobileCoef;
+					} else {
+						entCount ++;
+						bid *= (campaign.videoCoef + campaign.mobileCoef);
 					}
 				}
 
-
-				double impressionLimit = campaign.impsTogo();//TODO - overachiever - maybe implement it here
-				double budgetLimit = campaign.budget;
-				if(!campaign.critical){
-					bidBundle.setCampaignDailyLimit(campaign.id,
-							(int) impressionLimit, budgetLimit);
+				double publisherProfitProbability = userData.getUserOrientation(query.getPublisher(), campaign.targetSegment) * publisherPopularityMap.get(query.getPublisher());
+				if(query.getMarketSegments().size() == 0 && publisherProfitProbability > 0.6 && (!campaign.critical)){//TODO - Dan - define probability parameter (maybe change 0.6 to something else)
+					/* Unknown market segment, and the campaign isn't critical, so we're willing
+					 * to pay for it only if we're fairly sure who's the user
+					 */
+					bidBundle.addQuery(query, bid , new Ad(null),
+							campaign.id, 1);
+				}
+				else if(campaign.critical && query.getMarketSegments().size() == 0 && publisherProfitProbability > 0.5){
+					//Unknown market segment, but the campaign is critical, so we're willing to pay more money for it
+					bidBundle.addQuery(query, bid , new Ad(null),
+							campaign.id, 1);
 				}
 				else{
-					bidBundle.setCampaignDailyLimit(campaign.id,
-							(int) impressionLimit, budgetLimit * criticalFactor);	
+					//We know which market segment the user belongs to, bid the usual bid
+					bidBundle.addQuery(query, bid , new Ad(null),
+						campaign.id, campaignWeights.get(campaign));
 				}
-
-				System.out.println("Day " + day + ": Updated " + entCount
-						+ " Bid Bundle entries for Campaign id " + campaign.id);
 			}
+
+
+			double impressionLimit = campaign.impsTogo();//TODO - overachiever - maybe implement it here
+			double budgetLimit = campaign.budget;
+			if(!campaign.critical){
+				bidBundle.setCampaignDailyLimit(campaign.id,
+						(int) impressionLimit, budgetLimit);
+			}
+			else{
+				bidBundle.setCampaignDailyLimit(campaign.id,
+						(int) impressionLimit, budgetLimit * criticalFactor);	
+			}
+
+			System.out.println("Day " + day + ": Updated " + entCount
+					+ " Bid Bundle entries for Campaign id " + campaign.id);
 		}
 		if (bidBundle != null) {
 			System.out.println("Day " + day + ": Sending BidBundle");
@@ -775,29 +780,40 @@ public class Seven extends Agent {
 		double impressionsAchieved = campaign.stats.getTargetedImps();
 		double leftImpressionsToAchieve = Math.min(impressionOpertunitiesPerUserPerDay * marketSegmentSize, campaign.impsTogo());//TODO campaign. imps left to win
 		double badLeftImpressionsToAchieve =  Math.max(impressionOpertunitiesPerUserPerDay * marketSegmentSize, campaign.impsTogo());
-		double catastropheImpressionsToAchieve = Math.max(impressionOpertunitiesPerUserPerDay * marketSegmentSize * ((int)(campaign.dayEnd - day +1)), campaign.impsTogo());
+		double catastropheImpressionsToAchieve = Math.max(impressionOpertunitiesPerUserPerDay * marketSegmentSize * campaign.getCampaignLength(), campaign.impsTogo());
 		
 		double currentReach = campaign.impsTogo()/(((double)(campaign.dayEnd - day + 1)) * (MarketSegment.usersInMarketSegments().get(campaign.targetSegment)));
 		
 		double payment = 0;
 		
-		//bad stuff going on //TODO - define a parameter through which we'll choose a specific campaign to be crucial for rating (has to be closest campaign to end for effectiveness
-		if(day < 5 || currentReach < 0.9 * campaign.neededReach){
+		/**
+		 * Either first 5 days so the competition is fierce so bidding aggressively
+		 * Or the campaign isn't considered critical, but still needs to hurry up to complete
+		 * the campaign.
+		 */
+		if((!campaign.critical) && (day <= 5 || currentReach < 0.9 * campaign.neededReach)){
 			payment = calcGainedPercentage(campaign , catastropheImpressionsToAchieve , impressionsAchieved);
-		}	//these are the campaigns whose end's the nearest, everything went badly and its their responsibility to solve the issue
+		}
 
-		else if((!campaign.critical) && ((currentReach < campaign.neededReach && currentReach > 0.9 * campaign.neededReach) || campaign.getCampaignLength() < 5)){//default situation - all is well
+		 //bad stuff going on - but this campaign is not the one I'm going to waste money on
+		else if((!campaign.critical) && ((currentReach < campaign.neededReach && currentReach > 0.9 * campaign.neededReach) || campaign.getCampaignLength() < 5)){
 			payment = calcGainedPercentage(campaign , badLeftImpressionsToAchieve , impressionsAchieved);
-		} //bad stuff going on - but this campaign is not the one I'm going to waste money on
+		}
 		
+		//default situation - all is well
 		else if(!campaign.critical && currentReach > campaign.neededReach){
 			payment = calcGainedPercentage(campaign , leftImpressionsToAchieve , impressionsAchieved);
 		}
+		
 		else{//The campaign is considered critical in improving our rating
 			payment = criticalFactor * (calcGainedPercentage(campaign , catastropheImpressionsToAchieve , impressionsAchieved));
 		}
 		
-		return payment * 1000;//TODO - Multiply by 1000 because we're paying in CPMs 
+		/**
+		 * Multiply by 1000 because we're paying in CPMs (and not for single impressions)
+		 * and also normalize by the ratio (what we're going to get paid for 100% reach / amount of impressions for 100% reach) 
+		 */
+		return payment * 1000 * (campaign.promisedPayment/((double)campaign.reachImps));
 	}
 
 	private double calcGainedPercentage(CampaignData campaign , double toAdd , double current){
@@ -849,26 +865,18 @@ public class Seven extends Agent {
 
 	
 	
-	boolean ratingImprovementCrucial(){
-		if(day <= 5){return true;}
-		else if(qualityScore <= 1.0 && day <=20){return true;}
+	boolean ratingImprovementCrucial(){//TODO - Dan, maybe add some more else-ifs
+		if(qualityScore <= 1.0 && day <=20){return true;}
 		else if(qualityScore <= 0.95 && day <=40){return true;}
 		else if(qualityScore <= 0.80 && day <=50){return true;}
 		return false;
 	}//TODO - see what Oriel did in the implementation - He's the one to define how critical the rating is!!!!! (change this comment before submission)
 
 	
-	private double CalcRatingSignificance(){
-		/*
-		 * Calculating a function that decides the importance of the rating
-		 * depending on the current rating and the day.
-		 * On a scale of 1 to 100. We decided that for the first 5 days are the
-		 */
-		double significance = -0.04198*((double)(day*day)) + 0.41975 *((double)(day)) + 98.95062;
-		return significance / qualityScore;
-	}
 
 	void defineCrucialCampaigns(){
+		if(myActiveCampaigns.isEmpty()){ return; }
+
 		LinkedHashMap<Integer, CampaignData> list = sortCampaignsByComparator(myActiveCampaigns);
 		int i = 0;
 		Iterator<CampaignData> iter = list.values().iterator();
@@ -901,6 +909,7 @@ public class Seven extends Agent {
 		//Added by Daniel
 		private double neededReach;
 		private boolean critical;//Was the campaign chosen for improving our rating
+		private double promisedPayment;//What we'll get payed for 100% of the impressions needed for the campaign
 
 
 
