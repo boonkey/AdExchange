@@ -451,7 +451,8 @@ public class Seven extends Agent {
 			}
 
 			if(competition){
-				campaignWeights.put(campaign, (int) ((campaign.competitionImpsToGo()/(campaign.getdayEnd() - day +1)* 10.0)/totalReachLeft));
+				weight = (int)((campaign.competitionImpsToGo()/(campaign.getdayEnd() - day +1)* 10.0)/totalReachLeft);
+				campaignWeights.put(campaign, weight);
 			}
 			
 			if(campaign.isCritical()){//put a lot on the critical, divide weight among the others
