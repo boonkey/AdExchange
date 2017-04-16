@@ -71,7 +71,7 @@ public class ReadUserData {
 		readPublisherOrientationData();
 	}
 
-	//TODO - maybe we'll have to change the names in the code
+	//maybe we'll have to change the code to the names in the game
 
 	void readPublisherOrientationData(){
 		publisherAudienceOrientation = new HashMap<AudienceOrientation , Double>();
