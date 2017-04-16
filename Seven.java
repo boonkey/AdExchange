@@ -47,9 +47,9 @@ import edu.umich.eecs.tac.props.Ad;
 import edu.umich.eecs.tac.props.BankStatus;
 
 import Agent.src.Add.ReadUserData;//TODO - correct the import
-import consts;//TODO - correct the import
-import CampaignData;//TODO - correct the import
-import CampaignEngine;//TODO - correct the import
+import Agent.src.*;//TODO - correct the import
+//import CampaignData;//TODO - correct the import
+//import CampaignEngine;//TODO - correct the import
 
 
 
@@ -114,18 +114,10 @@ public class Seven extends Agent {
 	private Map<Integer, CampaignData> myActiveCampaigns;
 	private Map<Integer, CampaignData> activeCampaigns;
 	double qualityScore;
-	private static double a = 4.08577;
-	private static double b = 3.08577;
-	private static double impressionOpertunitiesPerUserPerDay = 1.42753;
 	private ReadUserData userData;
 	private double criticalFactor;
 	private Map<String , Double> publisherPopularityMap;
 
-	//Added by Katrin
-	//UCS parameters
-	private static double pi = 0.2;
-	private static double sigma = 0.3;
-	private static double initialUcs = 0.15; 
 
 	/*
 	 * the bidBundle to be sent daily to the AdX
@@ -294,7 +286,7 @@ public class Seven extends Agent {
 		 * (upper bound) price for the auction.
 		 */
 
-		long cmpimps = com.getReachImps();
+		//long cmpimps = com.getReachImps();
 		//Added by Daniel -> call to Oriel's method for the bid for the campaign
 		long cmpBidMillis = CampaignEngine.CalcPayment(pendingCampaign ,myActiveCampaigns , activeCampaigns , day , qualityScore);
 		pendingCampaign.setPromisedPayment((double) cmpBidMillis);
@@ -340,17 +332,17 @@ public class Seven extends Agent {
 	//Added by Katrin
 	private double calcUCS(double bid, double level){
 		double newUcsBid;
-		if (level > 0.9){
-			newUcsBid = bid/(1+pi);
+		if (level > consts.secondPlace){
+			newUcsBid = bid/(1+consts.pi);
 		}
-		else if (level > 0.81){
+		else if (level > consts.thirdPlace){
 			newUcsBid = bid;
 		}
-		else if (level > 0.6561) {
-			newUcsBid = bid*(1+pi);
+		else if (level > consts.fifthPlace) {
+			newUcsBid = bid*(1+consts.pi);
 		}
 		else {
-			newUcsBid = bid*(1+sigma);
+			newUcsBid = bid*(1+consts.sigma);
 		}
 		return newUcsBid;
 	}
@@ -450,15 +442,19 @@ public class Seven extends Agent {
 		for(CampaignData campaign : myActiveCampaigns.values()){
 			boolean competition = false;
 			int weight = 1;
+			double totalReachLeft = 0;
 			for(Set<MarketSegment> segment : SubMarketSegment(campaign.getTargetSegment())){
+				for(CampaignData camp : campaignOverlaps.get(segment)){
+					totalReachLeft += (camp.competitionImpsToGo()/(camp.getdayEnd() - day +1));
+				}
 				if(campaignOverlaps.get(segment).size() > 2){competition = true;}
 			}
 
 			if(competition){
-				campaignWeights.put(campaign, (int) (campaign.competitionImpsToGo()/(campaign.getdayEnd() - day +1)* 10.0));
+				campaignWeights.put(campaign, (int) ((campaign.competitionImpsToGo()/(campaign.getdayEnd() - day +1)* 10.0)/totalReachLeft));
 			}
 			
-			if(campaignisCritical()){//put a lot on the critical, divide weight among the others
+			if(campaign.isCritical()){//put a lot on the critical, divide weight among the others
 				campaignWeights.put(campaign, 10 * weight);
 			}
 		}	
@@ -605,14 +601,14 @@ public class Seven extends Agent {
 		//ucsBid = 0.1 + random.nextDouble()/10.0;
 		
 		//Added by Katrin
-		ucsBid = initialUcs;
+		ucsBid = consts.initialUcs;
 
 		myCampaigns = new HashMap<Integer, CampaignData>();
 		//Added by Daniel
 		myActiveCampaigns = new HashMap<Integer, CampaignData>();
 		activeCampaigns = new HashMap<Integer, CampaignData>();
 		userData = new ReadUserData();
-		criticalFactor = 1.2;
+		criticalFactor = consts.initialCriticalFactor;
 		publisherPopularityMap = new HashMap<String , Double>();
 		qualityScore = 1.0;
 
@@ -779,9 +775,9 @@ public class Seven extends Agent {
 	private double campaignProfitability(CampaignData campaign){
 		double marketSegmentSize = (double) MarketSegment.marketSegmentSize(campaign.getTargetSegment());
 		double impressionsAchieved = campaign.stats.getTargetedImps();
-		double leftImpressionsToAchieve = Math.min(impressionOpertunitiesPerUserPerDay * marketSegmentSize, campaign.impsTogo());//TODO campaign. imps left to win
-		double badLeftImpressionsToAchieve =  Math.max(impressionOpertunitiesPerUserPerDay * marketSegmentSize, campaign.impsTogo());
-		double catastropheImpressionsToAchieve = Math.max(impressionOpertunitiesPerUserPerDay * marketSegmentSize * campaign.getCampaignLength(), campaign.impsTogo());
+		double leftImpressionsToAchieve = Math.min(consts.impressionOpertunitiesPerUserPerDay * marketSegmentSize, campaign.impsTogo());//TODO campaign. imps left to win
+		double badLeftImpressionsToAchieve =  Math.max(consts.impressionOpertunitiesPerUserPerDay * marketSegmentSize, campaign.impsTogo());
+		double catastropheImpressionsToAchieve = Math.max(consts.impressionOpertunitiesPerUserPerDay * marketSegmentSize * campaign.getCampaignLength(), campaign.impsTogo());
 		
 		double currentReach = campaign.impsTogo()/(((double)(campaign.getdayEnd() - day + 1)) * (MarketSegment.usersInMarketSegments().get(campaign.getTargetSegment())));
 		
@@ -818,7 +814,7 @@ public class Seven extends Agent {
 	}
 
 	private double calcGainedPercentage(CampaignData campaign , double toAdd , double current){
-		return (1/toAdd)*(2/a)*(Math.atan(a*((toAdd + current)/campaign.getNeededReach())-b) - Math.atan(a*(current/campaign.getNeededReach())-b));
+		return (1/toAdd)*(2/consts.a)*(Math.atan(consts.a*((toAdd + current)/campaign.getNeededReach())-consts.b) - Math.atan(consts.a*(current/campaign.getNeededReach())-consts.b));
 	}
 
 	private void resetCriticalParameter(){

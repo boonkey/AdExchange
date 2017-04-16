@@ -1,4 +1,3 @@
-import ext.consts;//TODO - correct the import
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -9,7 +8,8 @@ import java.util.Set;
 import java.lang.Math;
 
 import tau.tac.adx.report.adn.MarketSegment;
-import ext.CampaignData;
+import Agent.src.*;//Dan - TODO -fix the import
+//import ext.consts;//TODO - correct the import
 
 public class CampaignEngine {
 		
@@ -41,14 +41,14 @@ public class CampaignEngine {
 			Map<Integer,CampaignData> MarketActiveCampaigns,int day, double rating){
 			double segmentGrade=0.0;
 			if ((MarketActiveCampaigns==null)||(MarketActiveCampaigns.size()==0)){//no active campaigns
-				segmentGrade=campaign.getreachImps() / ((campaign.getdayEnd() - campaign.getdayStart() + 1) * MarketSegment.marketSegmentSize(campaign.getTargetSegment()));
+				segmentGrade=campaign.getReachImps() / ((campaign.getdayEnd() - campaign.getdayStart() + 1) * MarketSegment.marketSegmentSize(campaign.getTargetSegment()));
 			}
 			else{//initializing parameters
 				m_campaignData = campaign;
 				m_lengthOfCampaign = (int) (m_campaignData.getdayEnd()- m_campaignData.getdayStart()+1);
 				m_Segements = campaign.getTargetSegment();
 				m_TotalMarketActiveCampaignData = ConvertToList(MarketActiveCampaigns);
-				m_lastSuggestionResultsResults = lastCampaign;
+				m_lastSuggestionResultsResults = lastCampaign;//TODO - Get Oriel to correct this
 				m_myRating = rating;
 				m_day = day;
 				activecampaigns = MarketActiveCampaigns;
@@ -72,17 +72,17 @@ public class CampaignEngine {
 				
 				segmentGrade = SegmentTypeGrade();
 			}
-			System.out.println("pre reach impression: " + campaign.getreachImps());//pre sugg
+			System.out.println("pre reach impression: " + campaign.getReachImps());//pre sugg
 			
 			if (m_myRating == segmentGrade){
-				return (long)(Math.floor(m_myRating*campaign.getreachImps()));
+				return (long)(Math.floor(m_myRating*campaign.getReachImps()));
 			}
-			else if ((long)Math.ceil(segmentGrade * campaign.getreachImps()) < consts.CampaignEngine_lowerBidLimit){ //avoiding very low budget campaigns
+			else if ((long)Math.ceil(segmentGrade * campaign.getReachImps()) < consts.CampaignEngine_lowerBidLimit){ //avoiding very low budget campaigns
 				System.out.println("Seven campaign Bidder: avoiding very low budget campaigns, bidding maximum");
-				return (long)(Math.floor(m_myRating * campaign.getreachImps())); 
+				return (long)(Math.floor(m_myRating * campaign.getReachImps())); 
 			}
 			else{
-				return (long)(Math.ceil(segmentGrade * campaign.getreachImps()));
+				return (long)(Math.ceil(segmentGrade * campaign.getReachImps()));
 			}
 		}
 
@@ -174,7 +174,7 @@ public class CampaignEngine {
 					dayWithinRange = true;
 				}
 				if (dayWithinRange && IsbasicSegmentinSetofSegments(CampaignSegment,basicMarketSegment)){//relevant date + relevant segment
-					popularityIndex = popularityIndex + ((double)campaign.getreachImps() / ((double)campaign.getSegmentSize() * ((double)endDay - startDay + 1)));// + reach/(size*lengthofcamp)
+					popularityIndex = popularityIndex + ((double)campaign.getReachImps() / ((double)campaign.getSegmentSize() * ((double)endDay - startDay + 1)));// + reach/(size*lengthofcamp)
 				}
 			}
 			return popularityIndex;

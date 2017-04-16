@@ -1,5 +1,3 @@
-package ext;
-
 import java.util.Set;
 
 import tau.tac.adx.demand.CampaignStats;
@@ -24,7 +22,7 @@ public class CampaignData {
 		double MyBid;
 		Boolean IsWin;
 		Double MyRating;
-		private AdxQuery[] campaignQueries;//array of queries relvent for the campaign.
+		AdxQuery[] campaignQueries;//array of queries relvent for the campaign.
 		CampaignStats stats;/* campaign info as reported */
 		double budget;
 		double remainingBudget;
@@ -61,7 +59,7 @@ public class CampaignData {
 
 			//Added by Daniel
 			neededReach = ((double)reachImps)/(((double)this.getCampaignLength()) * ((double)MarketSegment.usersInMarketSegments().get(targetSegment)));
-			campaign.critical = false;
+			critical = false;
 			}
 
 		public CampaignData(CampaignOpportunityMessage com) {
@@ -86,7 +84,7 @@ public class CampaignData {
 
 			//Added by Daniel
 			neededReach = ((double)reachImps)/(((double)this.getCampaignLength()) * ((double)MarketSegment.usersInMarketSegments().get(targetSegment)));
-			campaign.critical = false;
+			critical = false;
 		}
 
 		@Override
@@ -153,7 +151,7 @@ public class CampaignData {
 		 //Added by Daniel ------------------------------------------
 		//Allow ourselves to overachieve
 		int impsTogo() {
-			return (int) Math.max(0 , 1.1 * reachImps - stats.getTargetedImps());//TODO
+			return (int) Math.max(0 , 1.1 * reachImps - stats.getTargetedImps());//TODO - Dan - decide if 1.1 is ok or should we change it
 		}
 		//If we don't want to overachieve
 		int competitionImpsToGo(){
@@ -252,7 +250,4 @@ public class CampaignData {
 			return campaignDifficulty;
 		}
 		
-		public AdxQuery[] getCampaignQueries(){
-			return campaignQueries; 
-		}
 }
