@@ -111,11 +111,39 @@ public class Seven extends Agent {
 	//Added by Daniel - no point in keeping the total data about the campaigns we won, as we'll use only the data of the active campaigns
 
 	//Added by Daniel
+	/**
+	 * We maintain a collection (mapped by the campaign id) of the active
+	 * campaigns won by our agent.
+	 */
 	private Map<Integer, CampaignData> myActiveCampaigns;
+
+	/**
+	 * We maintain a collection (mapped by the campaign id) of the active
+	 * campaigns that are currently run by someone (us included).
+	 */
 	private Map<Integer, CampaignData> activeCampaigns;
+
+	/**
+	 * Our agent's current quality score
+	 */
 	double qualityScore;
+
+	/**
+	 * Class with which we save the probabilities that a user that enters a specific publisher's website
+	 * is part of a specific marketsegment.
+	 */
 	private ReadUserData userData;
+	
+	/**
+	 * The factor with which we are going to multiply our bids on
+	 * campaigns in case we have critical campaigns.
+	 */	
 	private double criticalFactor;
+
+	/**
+	 * We maintain a collection (mapped by the publisher name) of the probabilities
+	 * that a random user will enter the publisher's website.
+	 */
 	private Map<String , Double> publisherPopularityMap;
 
 
@@ -413,7 +441,9 @@ public class Seven extends Agent {
 		 * add bid entries w.r.t. each active campaign with remaining contracted
 		 * impressions.
 		 */
-		removeNonactiveCampaigns();
+		
+		//These campaigns aren't interesting anymore, remove them
+		 removeNonactiveCampaigns();
 
 		resetCriticalParameter();
 		
@@ -593,7 +623,6 @@ public class Seven extends Agent {
 
 	@Override
 	protected void simulationSetup() {
-		Random random = new Random();
 
 		day = 0;
 		bidBundle = new AdxBidBundle();
@@ -736,6 +765,12 @@ public class Seven extends Agent {
 
 	//Added by Daniel
 	//-----------------------------------------------------------------------------------------
+
+	/**
+	 * This method goes over the active campaign maps (myActiveCampaigns and activeCampaigns)
+	 * and removes the ones that aren't active anymore (whether they reached the goal impression
+	 * amount or they reached their last day).
+	 */
 	private void removeNonactiveCampaigns(){
 		int dayBiddingFor = day + 1;
 		for(CampaignData campaign: activeCampaigns.values()){
@@ -751,28 +786,33 @@ public class Seven extends Agent {
 		}
 	}
 
+	
+	/**
+	 * This method returns a Set of all of the triplets of market segments (which are sets themselves),
+	 * that if we merge them we'll recieve the original narketSegment recieved by the method.
+	 * Returns null, if the input marketSegment is null. 
+	 */
 	private Set<Set<MarketSegment>> SubMarketSegment(Set<MarketSegment> marketSegment){
 		if(marketSegment == null) return null;
 
 		Set<Set<MarketSegment>> subSegments = new HashSet<Set<MarketSegment>>();
-		boolean flag;
 
-		for(Set<MarketSegment> marketSegmentSet: MarketSegment.marketSegments()){
-			if(marketSegmentSet.size() != 3){continue;}
-			flag = true;
-			for(MarketSegment segment: marketSegment){
-				if(!marketSegmentSet.contains(segment)){
-					flag = false;
-					break;
-				}
-			}
-			if(flag){ subSegments.add(marketSegmentSet); }
+		for(Set<MarketSegment> subSet: MarketSegment.marketSegments()){
+			if(subSet.size() != 3){continue;}
+			
+			if(isContained(marketSegment , subSet)){ subSegments.add(subSet); }
 		}
-
 		return subSegments;
 	}
 
-
+	private boolean isContained(Set<MarketSegment> container , Set<MarketSegment> containee){
+		if(container == null || containee == null){ return false; }
+		for(MarketSegment seg : container){
+			if(!containee.contains(seg)){ return false; }
+		}
+		return true;
+	}
+	
 	private double campaignProfitability(CampaignData campaign){
 		double marketSegmentSize = (double) MarketSegment.marketSegmentSize(campaign.getTargetSegment());
 		double impressionsAchieved = campaign.stats.getTargetedImps();
