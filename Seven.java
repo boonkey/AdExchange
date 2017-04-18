@@ -805,6 +805,11 @@ public class Seven extends Agent {
 		return subSegments;
 	}
 
+	/**
+	 * This method returns true iff the "containee" set of market segments
+	 * is fully contained by the "container" set of market segments.
+	 * Returns false if either on of the is null.
+	 */
 	private boolean isContained(Set<MarketSegment> container , Set<MarketSegment> containee){
 		if(container == null || containee == null){ return false; }
 		for(MarketSegment seg : container){
@@ -813,6 +818,10 @@ public class Seven extends Agent {
 		return true;
 	}
 	
+	/**
+	 * This method returns the basic bid we're going to offer upon an impression opportunity of a given campaign
+	 * on a given day by different parameter (the math is explained in the final report). //TODO - add explanation to the math in the final report
+	 */
 	private double campaignProfitability(CampaignData campaign){
 		double marketSegmentSize = (double) MarketSegment.marketSegmentSize(campaign.getTargetSegment());
 		double impressionsAchieved = campaign.stats.getTargetedImps();
@@ -851,13 +860,21 @@ public class Seven extends Agent {
 		 * Multiply by 1000 because we're paying in CPMs (and not for single impressions)
 		 * and also normalize by the ratio (what we're going to get paid for 100% reach / amount of impressions for 100% reach) 
 		 */
-		return payment * 1000 * (campaign.getPromisedPayment()/((double)campaign.getReachImps()));
+		return payment * 1000.0 * (campaign.getPromisedPayment()/((double)campaign.getReachImps()));
 	}
 
+	/**
+	 * This method calculates how much of the campaign (in percent) we'll complete per single
+	 * impression if we add "tooAdd" impressions to the "current" impressions we already achieved
+	 * during the run of the campaign.
+	 */
 	private double calcGainedPercentage(CampaignData campaign , double toAdd , double current){
-		return (1/toAdd)*(2/consts.a)*(Math.atan(consts.a*((toAdd + current)/campaign.getNeededReach())-consts.b) - Math.atan(consts.a*(current/campaign.getNeededReach())-consts.b));
+		return (1.0/toAdd)*(2.0/consts.a)*(Math.atan(consts.a*((toAdd + current)/campaign.getNeededReach())-consts.b) - Math.atan(consts.a*(current/campaign.getNeededReach())-consts.b));
 	}
 
+	/**
+	 * This method resets the critical parameter of all our active campaigns to false.
+	 */
 	private void resetCriticalParameter(){
 		for(CampaignData campaign: myActiveCampaigns.values()){
 			if(!campaign.isCritical()){continue;}
@@ -874,6 +891,11 @@ public class Seven extends Agent {
 	}
 
 
+	/**
+	 * We'll want to find the easiest campaigns through which we can boost our quality score (or "rating" as
+	 * specified in other parts of the code). This method returns a linked HashMap in which the campaigns are
+	 * sorted in regards of their potential to boost our quality score.
+	 */
 	private static LinkedHashMap<Integer, CampaignData> sortCampaignsByComparator(Map<Integer, CampaignData> unsortMap){
 
 		List<Entry<Integer, CampaignData>> list = new LinkedList<Entry<Integer, CampaignData>>(unsortMap.entrySet());
@@ -887,7 +909,7 @@ public class Seven extends Agent {
 					return ((int)(c1.getdayEnd() - c2.getdayEnd()));
 				}
 				else{
-					return c1.getCampaignLength() * c1.impsTogo() - c2.getCampaignLength() * c2.impsTogo();
+					return (c1.impsTogo())/(c1.getdayEnd() - day + 1) - (c2.impsTogo())/(c2.getdayEnd() - day + 1);
 				}
 			}//TODO
 		});
@@ -902,7 +924,10 @@ public class Seven extends Agent {
 
 
 	
-	
+	/**
+	 * This method defines how critical it is for us to improve our quality score
+	 * according to how advanced we're in the game.
+	 */
 	boolean ratingImprovementCrucial(){//TODO - Dan, maybe add some more else-ifs
 		if(qualityScore <= 1.0 && day <=20){return true;}
 		else if(qualityScore <= 0.95 && day <=40){return true;}
@@ -911,7 +936,10 @@ public class Seven extends Agent {
 	}//TODO - see what Oriel did in the implementation - He's the one to define how critical the rating is!!!!! (change this comment before submission)
 
 	
-
+	/**
+	 * If called, this method sets the critical parameter to at most 2 campaigns to true
+	 * and its their job to save our quality score.
+	 */
 	void defineCrucialCampaigns(){
 		if(myActiveCampaigns.isEmpty()){ return; }
 
@@ -919,7 +947,7 @@ public class Seven extends Agent {
 		int i = 0;
 		Iterator<CampaignData> iter = list.values().iterator();
 		while(iter.hasNext()){
-			if( i > myActiveCampaigns.size() / 5 || i > 1){break;}
+			if( (i > myActiveCampaigns.size() / 5 && i > 6) || i > 2){break;}
 			CampaignData campaign = iter.next();
 			campaign.setCriticalParameter(true);
 			i++;
