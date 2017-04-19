@@ -38,7 +38,8 @@ public class CampaignEngine {
 		 * calculate campaign offer
 		 */
 		public static long CalcPayment(CampaignData campaign,Map<Integer,CampaignData> ourActiveCampaigns,
-			Map<Integer,CampaignData> MarketActiveCampaigns,int day, double rating){
+			Map<Integer,CampaignData> MarketActiveCampaigns,int day, double rating,
+			CampaignData lastCampaign){
 			double segmentGrade=0.0;
 			if ((MarketActiveCampaigns==null)||(MarketActiveCampaigns.size()==0)){//no active campaigns
 				segmentGrade=campaign.getReachImps() / ((campaign.getdayEnd() - campaign.getdayStart() + 1) * MarketSegment.marketSegmentSize(campaign.getTargetSegment()));
