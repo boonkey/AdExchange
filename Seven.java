@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
-import java.util.Random;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -46,8 +45,8 @@ import tau.tac.adx.report.publisher.AdxPublisherReportEntry;
 import edu.umich.eecs.tac.props.Ad;
 import edu.umich.eecs.tac.props.BankStatus;
 
-import Agent.src.Add.ReadUserData;//TODO - correct the import
-import Agent.src.*;//TODO - correct the import
+//import Agent.src.Add.ReadUserData;//TODO - correct the import
+//import Agent.src.*;//TODO - correct the import
 //import CampaignData;//TODO - correct the import
 //import CampaignEngine;//TODO - correct the import
 
@@ -122,6 +121,9 @@ public class Seven extends Agent {
 	 * campaigns that are currently run by someone (us included).
 	 */
 	private Map<Integer, CampaignData> activeCampaigns;
+	
+	// Parameter of last active campaign for usage in calcPayment
+	private CampaignData lastCampaign;
 
 	/**
 	 * Our agent's current quality score
@@ -278,16 +280,18 @@ public class Seven extends Agent {
 		campaignData.setBudget(initialCampaignMessage.getBudgetMillis()/1000.0);
 		currCampaign = campaignData;
 		genCampaignQueries(currCampaign);
-
 		/*
 		 * The initial campaign is already allocated to our agent so we add it
 		 * to our allocated-campaigns list.
 		 */
 		System.out.println("Day " + day + ": Allocated campaign - " + campaignData);
 		myCampaigns.put(initialCampaignMessage.getId(), campaignData);
+		
 		//added by Daniel
 		myActiveCampaigns.put(initialCampaignMessage.getId(), campaignData);
 		activeCampaigns.put(initialCampaignMessage.getId(), campaignData);
+		lastCampaign = currCampaign;
+		currCampaign.setPromisedPayment((double) currCampaign.getReachImps());
 		
 	}
 
@@ -316,7 +320,15 @@ public class Seven extends Agent {
 
 		//long cmpimps = com.getReachImps();
 		//Added by Daniel -> call to Oriel's method for the bid for the campaign
-		long cmpBidMillis = CampaignEngine.CalcPayment(pendingCampaign ,myActiveCampaigns , activeCampaigns , day , qualityScore);
+		
+		//find last active campaign
+		for(CampaignData campaign: activeCampaigns.values()){
+			if (lastCampaign.getdayStart() < campaign.getdayStart())
+				lastCampaign = campaign;
+			}
+				
+		
+		long cmpBidMillis = CampaignEngine.CalcPayment(pendingCampaign ,myActiveCampaigns , activeCampaigns , day , qualityScore, lastCampaign);
 		pendingCampaign.setPromisedPayment((double) cmpBidMillis);
 		
 		System.out.println("Day " + day + ": Campaign total budget bid (millis): " + cmpBidMillis);
@@ -331,7 +343,7 @@ public class Seven extends Agent {
 			
 			//Added By Katrin
 			
-			if(null != myActiveCampaigns && myActiveCampaigns.isEmpty()){
+			if(null == myActiveCampaigns || myActiveCampaigns.isEmpty()){
 				if (ucsBid != 0) {
 					lastUcsBid = ucsBid;
 					lastUcsLevel = ucsLevel;
@@ -400,10 +412,17 @@ public class Seven extends Agent {
 			currCampaign = pendingCampaign;
 			genCampaignQueries(currCampaign);
 			myCampaigns.put(pendingCampaign.getId(), pendingCampaign);
+			
+			//Added by Daniel
+			myActiveCampaigns.put(pendingCampaign.getId(), pendingCampaign);
 
+			
 			campaignAllocatedTo = " WON at cost (Millis)"
 					+ notificationMessage.getCostMillis();
 		}
+		
+		activeCampaigns.put(pendingCampaign.getId(), pendingCampaign);
+
 		qualityScore = notificationMessage.getQualityScore();
 		System.out.println("Day " + day + ": " + campaignAllocatedTo
 				+ ". UCS Level set to " + notificationMessage.getServiceLevel()
@@ -441,13 +460,15 @@ public class Seven extends Agent {
 		 * add bid entries w.r.t. each active campaign with remaining contracted
 		 * impressions.
 		 */
-		
-		//These campaigns aren't interesting anymore, remove them
+
+		//Remove the campaigns that don't interest us anymore
 		 removeNonactiveCampaigns();
 
 		resetCriticalParameter();
 		
-		/* Check the current rating situation and decide how critical it is to improve it
+
+		/**
+		 * Check the current rating situation and decide how critical it is to improve it
 		 * i.e. ask ourselves: "are we willing to lose money on campaigns to improve our
 		 * rating?"
 		 */
@@ -456,7 +477,7 @@ public class Seven extends Agent {
 		//Decide weight of a campaign
 		Map <Set<MarketSegment> , Set<CampaignData>> campaignOverlaps = new HashMap<Set<MarketSegment> , Set<CampaignData>>();		
 		Map <CampaignData , Integer> campaignWeights = new HashMap<CampaignData,Integer>();
-
+		
 		for(CampaignData campaign : myActiveCampaigns.values()){
 			for(Set<MarketSegment> segment: SubMarketSegment(campaign.getTargetSegment())){
 				Set<CampaignData> set = campaignOverlaps.get(segment);
@@ -469,6 +490,8 @@ public class Seven extends Agent {
 			}
 		}
 
+
+		
 		for(CampaignData campaign : myActiveCampaigns.values()){
 			boolean competition = false;
 			int weight = 1;
@@ -490,6 +513,7 @@ public class Seven extends Agent {
 			}
 		}	
 
+		
 		//Actually bid for the campaign
 		for(CampaignData campaign: myActiveCampaigns.values()){
 
@@ -523,18 +547,13 @@ public class Seven extends Agent {
 					}
 				}
 
-				double publisherProfitProbability = userData.getUserOrientation(query.getPublisher(), campaign.getTargetSegment()) * publisherPopularityMap.get(query.getPublisher());
-				if(query.getMarketSegments().size() == 0 && publisherProfitProbability > 0.6 && (!campaign.isCritical())){//TODO - Dan - define probability parameter (maybe change 0.6 to something else)
-					/* Unknown market segment, and the campaign isn't critical, so we're willing
-					 * to pay for it only if we're fairly sure who's the user
-					 */
-					bidBundle.addQuery(query, bid , new Ad(null),
-							campaign.getId(), 1);
-				}
-				else if(campaign.isCritical() && query.getMarketSegments().size() == 0 && publisherProfitProbability > 0.5){
-					//Unknown market segment, but the campaign is critical, so we're willing to pay more money for it
-					bidBundle.addQuery(query, bid , new Ad(null),
-							campaign.getId(), 1);
+				if(query.getMarketSegments().size() == 0){
+					double publisherProfitProbability = userData.getUserOrientation(query.getPublisher(), campaign.getTargetSegment()) * publisherPopularityMap.get(query.getPublisher());
+					if(campaign.isCritical() && publisherProfitProbability > 0.5){
+						//Unknown market segment, but the campaign is critical, so we're willing to pay money for it
+						bidBundle.addQuery(query, bid , new Ad(null),
+								campaign.getId(), 1);
+					}					
 				}
 				else{
 					//We know which market segment the user belongs to, bid the usual bid
@@ -580,7 +599,7 @@ public class Seven extends Agent {
 			CampaignStats cstats = campaignReport.getCampaignReportEntry(
 					campaignKey).getCampaignStats();
 			myCampaigns.get(cmpId).setStats(cstats);
-
+			
 			System.out.println("Day " + day + ": Updating campaign " + cmpId + " stats: "
 					+ cstats.getTargetedImps() + " tgtImps "
 					+ cstats.getOtherImps() + " nonTgtImps. Cost of imps is "
@@ -632,6 +651,8 @@ public class Seven extends Agent {
 		
 		//Added by Katrin
 		ucsBid = consts.initialUcs;
+		lastUcsBid = consts.initialUcs;
+
 
 		myCampaigns = new HashMap<Integer, CampaignData>();
 		//Added by Daniel
@@ -772,16 +793,22 @@ public class Seven extends Agent {
 	 * amount or they reached their last day).
 	 */
 	private void removeNonactiveCampaigns(){
-		int dayBiddingFor = day + 1;
-		for(CampaignData campaign: activeCampaigns.values()){
+		int dayBiddingFor = day + 1;//TODO - might need changing
+		
+		for(Iterator<Map.Entry<Integer, CampaignData>> it = activeCampaigns.entrySet().iterator(); it.hasNext();){
+			Map.Entry<Integer, CampaignData> entry = it.next();
+			CampaignData campaign = entry.getValue();
+			
 			if(dayBiddingFor > campaign.getdayEnd()){
-				activeCampaigns.remove(campaign.getId());
-				myActiveCampaigns.remove(campaign.getId());
-			}
+				it.remove();
+			}			
 		}
-		for(CampaignData campaign: activeCampaigns.values()){
-			if(campaign.impsTogo() == 0){
-				myActiveCampaigns.remove(campaign.getId());
+		
+		for(Iterator<Map.Entry<Integer, CampaignData>> it = myActiveCampaigns.entrySet().iterator(); it.hasNext();){
+			Map.Entry<Integer, CampaignData> entry = it.next();
+			CampaignData campaign = entry.getValue();
+			if(dayBiddingFor > campaign.getdayEnd() || (campaign.impsTogo() <= 0 && !campaign.isCritical())){
+				it.remove();
 			}
 		}
 	}
@@ -789,7 +816,7 @@ public class Seven extends Agent {
 	
 	/**
 	 * This method returns a Set of all of the triplets of market segments (which are sets themselves),
-	 * that if we merge them we'll recieve the original narketSegment recieved by the method.
+	 * that if we merge them we'll receive the original narketSegment received by the method.
 	 * Returns null, if the input marketSegment is null. 
 	 */
 	private Set<Set<MarketSegment>> SubMarketSegment(Set<MarketSegment> marketSegment){
@@ -829,7 +856,7 @@ public class Seven extends Agent {
 		double badLeftImpressionsToAchieve =  Math.max(consts.impressionOpertunitiesPerUserPerDay * marketSegmentSize, campaign.impsTogo());
 		double catastropheImpressionsToAchieve = Math.max(consts.impressionOpertunitiesPerUserPerDay * marketSegmentSize * campaign.getCampaignLength(), campaign.impsTogo());
 		
-		double currentReach = campaign.impsTogo()/(((double)(campaign.getdayEnd() - day + 1)) * (MarketSegment.usersInMarketSegments().get(campaign.getTargetSegment())));
+		double currentReach = ((double)campaign.impsTogo())/(((double)(campaign.getdayEnd() - day + 1)) * (MarketSegment.usersInMarketSegments().get(campaign.getTargetSegment())));
 		
 		double payment = 0;
 		
@@ -838,23 +865,26 @@ public class Seven extends Agent {
 		 * Or the campaign isn't considered critical, but still needs to hurry up to complete
 		 * the campaign.
 		 */
-		if((!campaign.isCritical()) && (day <= 5 || currentReach < 0.9 * campaign.getNeededReach())){
-			payment = calcGainedPercentage(campaign , catastropheImpressionsToAchieve , impressionsAchieved);
-		}
+		if(!campaign.isCritical()){
+			if((day <= 5 || currentReach < 0.9 * campaign.getNeededReach())){
+				payment = calcGainedPercentage(campaign , catastropheImpressionsToAchieve , impressionsAchieved);
+				System.out.println("glue5 - "+payment * 1000.0 * (campaign.getPromisedPayment()/((double)campaign.getReachImps())));//TODO
+			}
 
-		 //bad stuff going on - but this campaign is not the one I'm going to waste money on
-		else if((!campaign.isCritical()) && ((currentReach < campaign.getNeededReach() && currentReach > 0.9 * campaign.getNeededReach()) || campaign.getCampaignLength() < 5)){
-			payment = calcGainedPercentage(campaign , badLeftImpressionsToAchieve , impressionsAchieved);
-		}
+			//bad stuff going on - but this campaign is not the one I'm going to waste money on
+			else if(((currentReach < campaign.getNeededReach() && currentReach > 0.9 * campaign.getNeededReach()) || campaign.getCampaignLength() < 5)){
+				payment = calcGainedPercentage(campaign , badLeftImpressionsToAchieve , impressionsAchieved);
+			}
 		
-		//default situation - all is well
-		else if(!campaign.isCritical() && currentReach > campaign.getNeededReach()){
-			payment = calcGainedPercentage(campaign , leftImpressionsToAchieve , impressionsAchieved);
+			//default situation - all is well
+			else if(currentReach > campaign.getNeededReach()){
+				payment = calcGainedPercentage(campaign , leftImpressionsToAchieve , impressionsAchieved);
+			}
 		}
-		
 		else{//The campaign is considered critical in improving our rating
 			payment = criticalFactor * (calcGainedPercentage(campaign , catastropheImpressionsToAchieve , impressionsAchieved));
 		}
+		System.out.println("glue5 - "+payment * 1000.0 * (campaign.getPromisedPayment()/((double)campaign.getReachImps())));//TODO
 		
 		/**
 		 * Multiply by 1000 because we're paying in CPMs (and not for single impressions)
@@ -896,7 +926,7 @@ public class Seven extends Agent {
 	 * specified in other parts of the code). This method returns a linked HashMap in which the campaigns are
 	 * sorted in regards of their potential to boost our quality score.
 	 */
-	private static LinkedHashMap<Integer, CampaignData> sortCampaignsByComparator(Map<Integer, CampaignData> unsortMap){
+	private LinkedHashMap<Integer, CampaignData> sortCampaignsByComparator(Map<Integer, CampaignData> unsortMap){
 
 		List<Entry<Integer, CampaignData>> list = new LinkedList<Entry<Integer, CampaignData>>(unsortMap.entrySet());
 
@@ -909,9 +939,14 @@ public class Seven extends Agent {
 					return ((int)(c1.getdayEnd() - c2.getdayEnd()));
 				}
 				else{
-					return (c1.impsTogo())/(c1.getdayEnd() - day + 1) - (c2.impsTogo())/(c2.getdayEnd() - day + 1);
+					if((((c1.impsTogo())/(c1.getdayEnd() - day + 1))/c1.getNeededReach() - ((c2.impsTogo())/(c2.getdayEnd() - day + 1))/c2.getNeededReach()) >0){
+						return 1;
+					}
+					else{
+						return -1;
+					}
 				}
-			}//TODO
+			}
 		});
 
 		// Maintaining insertion order with the help of LinkedList
@@ -929,8 +964,8 @@ public class Seven extends Agent {
 	 * according to how advanced we're in the game.
 	 */
 	boolean ratingImprovementCrucial(){//TODO - Dan, maybe add some more else-ifs
-		if(qualityScore <= 1.0 && day <=20){return true;}
-		else if(qualityScore <= 0.95 && day <=40){return true;}
+		if(qualityScore <= 0.95 && day <=20){return true;}
+		else if(qualityScore <= 0.9 && day <=40){return true;}
 		else if(qualityScore <= 0.80 && day <=50){return true;}
 		return false;
 	}//TODO - see what Oriel did in the implementation - He's the one to define how critical the rating is!!!!! (change this comment before submission)
@@ -945,12 +980,13 @@ public class Seven extends Agent {
 
 		LinkedHashMap<Integer, CampaignData> list = sortCampaignsByComparator(myActiveCampaigns);
 		int i = 0;
-		Iterator<CampaignData> iter = list.values().iterator();
+		Iterator<Entry<Integer,CampaignData>> iter = list.entrySet().iterator();
 		while(iter.hasNext()){
+			Entry<Integer,CampaignData> entry = iter.next();
+			CampaignData campaign = entry.getValue();
 			if( (i > myActiveCampaigns.size() / 5 && i > 6) || i > 2){break;}
-			CampaignData campaign = iter.next();
-			campaign.setCriticalParameter(true);
-			i++;
+				campaign.setCriticalParameter(true);
+				i++;
 		}
 	}
 	

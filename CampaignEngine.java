@@ -8,7 +8,7 @@ import java.util.Set;
 import java.lang.Math;
 
 import tau.tac.adx.report.adn.MarketSegment;
-import Agent.src.*;//Dan - TODO -fix the import
+//import Agent.src.*;//Dan - TODO -fix the import
 //import ext.consts;//TODO - correct the import
 
 public class CampaignEngine {
@@ -49,7 +49,7 @@ public class CampaignEngine {
 				m_lengthOfCampaign = (int) (m_campaignData.getdayEnd()- m_campaignData.getdayStart()+1);
 				m_Segements = campaign.getTargetSegment();
 				m_TotalMarketActiveCampaignData = ConvertToList(MarketActiveCampaigns);
-				m_lastSuggestionResultsResults = lastCampaign;//TODO - Get Oriel to correct this
+				m_lastSuggestionResultsResults = lastCampaign;
 				m_myRating = rating;
 				m_day = day;
 				activecampaigns = MarketActiveCampaigns;
@@ -59,7 +59,13 @@ public class CampaignEngine {
 				//building segment set //might look nicer in a separate function...
 				basicSegmentsList = new ArrayList<Set<MarketSegment>>();
 				//adding {FEMALE, MALE}X{LOW_INCOME,HIGH_INCOME}x{YOUNG,OLD}
-				basicSegmentsList.add(MarketSegment.compundMarketSegment3(MarketSegment.MALE,MarketSegment.LOW_INCOME, MarketSegment.YOUNG));
+				//replaced by Daniel
+				for(Set<MarketSegment> subSet: MarketSegment.marketSegments()){
+					if(subSet.size() != 3){continue;}
+					basicSegmentsList.add(subSet);
+				}					
+
+/*				basicSegmentsList.add(MarketSegment.compundMarketSegment3(MarketSegment.MALE,MarketSegment.LOW_INCOME, MarketSegment.YOUNG));
 				basicSegmentsList.add(MarketSegment.compundMarketSegment3(MarketSegment.MALE,MarketSegment.LOW_INCOME, MarketSegment.OLD));
 				basicSegmentsList.add(MarketSegment.compundMarketSegment3(MarketSegment.MALE,MarketSegment.HIGH_INCOME, MarketSegment.YOUNG));
 				basicSegmentsList.add(MarketSegment.compundMarketSegment3(MarketSegment.MALE,MarketSegment.HIGH_INCOME, MarketSegment.OLD));
@@ -67,7 +73,7 @@ public class CampaignEngine {
 				basicSegmentsList.add(MarketSegment.compundMarketSegment3(MarketSegment.FEMALE,MarketSegment.LOW_INCOME,MarketSegment.OLD));
 				basicSegmentsList.add(MarketSegment.compundMarketSegment3(MarketSegment.FEMALE,MarketSegment.HIGH_INCOME,MarketSegment.YOUNG));
 				basicSegmentsList.add(MarketSegment.compundMarketSegment3(MarketSegment.FEMALE,MarketSegment.HIGH_INCOME,MarketSegment.OLD));
-				
+*/			
 				
 				System.out.println("number of active campaign in the campaign engine is: " + activecampaigns.size());
 				

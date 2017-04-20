@@ -58,9 +58,10 @@ public class CampaignData {
 			campaignDifficulty = (double)reachImps/((double)(1+dayEnd-dayStart)*(double)(MarketSegment.marketSegmentSize(targetSegment)));
 
 			//Added by Daniel
-			neededReach = ((double)reachImps)/(((double)this.getCampaignLength()) * ((double)MarketSegment.usersInMarketSegments().get(targetSegment)));
+			neededReach = ((double)reachImps)/(((double)getCampaignLength()) * ((double)MarketSegment.marketSegmentSize(targetSegment)));
 			critical = false;
-			}
+			promisedPayment = 0.0;
+		}
 
 		public CampaignData(CampaignOpportunityMessage com) {
 			dayStart = com.getDayStart();
@@ -85,6 +86,7 @@ public class CampaignData {
 			//Added by Daniel
 			neededReach = ((double)reachImps)/(((double)this.getCampaignLength()) * ((double)MarketSegment.usersInMarketSegments().get(targetSegment)));
 			critical = false;
+			promisedPayment = 0.0;
 		}
 
 		@Override
@@ -151,7 +153,7 @@ public class CampaignData {
 		 //Added by Daniel ------------------------------------------
 		//Allow ourselves to overachieve
 		int impsTogo() {
-			return (int) Math.max(0 , 1.1 * reachImps - stats.getTargetedImps());//TODO - Dan - decide if 1.1 is ok or should we change it
+			return (int) Math.max(0 , 1.15 * reachImps - stats.getTargetedImps());//TODO - Dan - decide if 1.1 is ok or should we change it
 		}
 		//If we don't want to overachieve
 		int competitionImpsToGo(){
